@@ -10,9 +10,9 @@ int main() {
     ChronCacheHashKey<std::string> hash_key1(key1);
     std::cout <<"Raw key:"<< hash_key1.get_raw() << " Hashed key: " << hash_key1.get() << std::endl;
 
-    // int key2 = 123;
-    // ChronCacheHashKey<int> hash_key2(key2);
-    // std::cout <<"Raw key:"<< hash_key2.get_raw() << " Hashed key: " << hash_key2.get() << std::endl;
+    int key2 = 123;
+    ChronCacheHashKey<int> hash_key2(key2);
+    std::cout <<"Raw key:"<< hash_key2.get_raw() << " Hashed key: " << hash_key2.get() << std::endl;
 
     // float key3 = 123.456;
     // ChronCacheHashKey<float> hash_key3(key3);

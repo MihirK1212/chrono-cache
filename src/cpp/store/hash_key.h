@@ -16,8 +16,8 @@ class ChronCacheHashKey {
         // allow only numerical and string keys
         if(
             !(
-                // std::is_same<T, int>::value 
-                std::is_same<T, std::string>::value
+                std::is_same<T, int>::value 
+                || std::is_same<T, std::string>::value
                 // || std::is_same<T, float>::value 
                 // || std::is_same<T, double>::value
                 // || std::is_same<T, long>::value
