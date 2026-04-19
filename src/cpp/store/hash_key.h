@@ -36,7 +36,7 @@ class ChronCacheHashKey {
         ) {
             throw std::runtime_error("Invalid key type");
         }
-        return std::hash<std::string>()(key);
+        return std::hash<std::string>()(std::to_string(key));
     }
 
     public:
