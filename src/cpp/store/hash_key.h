@@ -18,20 +18,20 @@ class ChronCacheHashKey {
             !(
                 std::is_same<T, int>::value 
                 || std::is_same<T, std::string>::value
-                // || std::is_same<T, float>::value 
-                // || std::is_same<T, double>::value
-                // || std::is_same<T, long>::value
-                // || std::is_same<T, long long>::value
-                // || std::is_same<T, unsigned int>::value
-                // || std::is_same<T, unsigned long>::value
-                // || std::is_same<T, unsigned long long>::value
-                // || std::is_same<T, char>::value
-                // || std::is_same<T, unsigned char>::value
-                // || std::is_same<T, short>::value
-                // || std::is_same<T, unsigned short>::value
-                // || std::is_same<T, bool>::value
-                // || std::is_same<T, long double>::value
-                // || std::is_same<T, wchar_t>::value
+                || std::is_same<T, float>::value 
+                || std::is_same<T, double>::value
+                || std::is_same<T, long>::value
+                || std::is_same<T, long long>::value
+                || std::is_same<T, unsigned int>::value
+                || std::is_same<T, unsigned long>::value
+                || std::is_same<T, unsigned long long>::value
+                || std::is_same<T, char>::value
+                || std::is_same<T, unsigned char>::value
+                || std::is_same<T, short>::value
+                || std::is_same<T, unsigned short>::value
+                || std::is_same<T, bool>::value
+                || std::is_same<T, long double>::value
+                || std::is_same<T, wchar_t>::value
             )
         ) {
             throw std::runtime_error("Invalid key type");
