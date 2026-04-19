@@ -10,9 +10,9 @@ class ChronCacheHashKey {
     private:
 
     T raw_key;
-    std::string hashed_key;
+    size_t hashed_key;
 
-    std::string hash_function(const T& key) const {
+    size_t hash_function(const T& key) const {
         // allow only numerical and string keys
         if(
             !(
@@ -47,7 +47,7 @@ class ChronCacheHashKey {
     
     ~ChronCacheHashKey() = default;
 
-    const std::string& get() const {
+    const size_t& get() const {
         return hashed_key;
     }
 
