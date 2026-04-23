@@ -11,8 +11,12 @@ class ChronCacheHashMap {
     private:
     int capacity;
 
-    // bucketHeadNode[bucketIndex] stores the address of the head node of the `bucketIndex` bucket
     std::vector<ChronCacheNode<T_key, T_value>*> bucketHeadNode; 
+    std::vector<ChronCacheNode<T_key, T_value>*> bucketTailNode;
+
+    // Flattened global list: bucket 0 nodes -> bucket 1 nodes -> ... -> bucket N nodes
+    ChronCacheNode<T_key, T_value>* globalHead = nullptr;
+    ChronCacheNode<T_key, T_value>* globalTail = nullptr;
 
     public:
     ChronCacheHashMap(int capacity);
@@ -23,5 +27,7 @@ class ChronCacheHashMap {
 
     int get_bucket_index(const T_key& key) const;
 };
+
+// #include "hash_map.cpp"
 
 #endif

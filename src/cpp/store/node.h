@@ -4,9 +4,7 @@
 #include "hash_key.h"
 
 template<typename T_key, typename T_value>
-
 struct ChronCacheNode {
-    private:
     const T_key key;
     T_value value;
 
@@ -14,7 +12,6 @@ struct ChronCacheNode {
     ChronCacheNode* prev_global;   // Previous node in global traversal
     ChronCacheNode* next_global;   // Next node in global traversal
 
-    public:
     ChronCacheNode(const T_key& key, const T_value& value) : key(key), value(value) {
         next_in_bucket = nullptr;
         prev_global = nullptr;
