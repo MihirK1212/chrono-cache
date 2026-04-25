@@ -269,7 +269,7 @@ void ChronCacheHashMap<T_key, T_value>::resize(int new_capacity) {
 
 template<typename T_key, typename T_value>
 int ChronCacheHashMap<T_key, T_value>::get_hashed_key(const T_key& key) const {
-    return ChronCacheHashKey<T_key>(key).get_hashed_key();
+    return ChronCacheHashKey<T_key>(key).get();
 }
 
 template<typename T_key, typename T_value>
