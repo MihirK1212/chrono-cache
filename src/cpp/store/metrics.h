@@ -5,53 +5,59 @@
 
 struct ChronCacheHashMapMetrics {
     int num_buckets;
-    int num_entries; 
-    int num_collisions; 
-    int num_resizes; 
+    int num_entries;
+    int num_collisions;
+    int num_resizes;
     int max_chain_length;
-    int load_factor;
+    double load_factor_val;
 
-    ChronCacheHashMapMetrics(int num_buckets) : num_buckets(num_buckets), num_entries(0), num_collisions(0), num_resizes(0), max_chain_length(0), load_factor(0) {}
+    ChronCacheHashMapMetrics(int num_buckets)
+        : num_buckets(num_buckets)
+        , num_entries(0)
+        , num_collisions(0)
+        , num_resizes(0)
+        , max_chain_length(0)
+        , load_factor_val(0.0) {}
+
     ~ChronCacheHashMapMetrics() = default;
 
     void new_element_event(bool is_collision, int chain_length) {
         if (is_collision) {
-            this->num_collisions++;
+            num_collisions++;
         }
-        if (chain_length > this->max_chain_length) {
-            this->max_chain_length = chain_length;
+        if (chain_length > max_chain_length) {
+            max_chain_length = chain_length;
         }
-        this->num_entries++;
-        this->set_load_factor();
+        num_entries++;
+        recalculate_load_factor();
     }
 
     void remove_element_event() {
-        this->num_entries--;
-        this->set_load_factor();
+        num_entries--;
+        recalculate_load_factor();
     }
 
     void resize_event_triggered(int curr_capacity, int new_capacity) {
-        if (this->num_buckets != curr_capacity) {
+        if (num_buckets != curr_capacity) {
             throw std::runtime_error("Current capacity does not match the number of buckets");
         }
 
-        this->num_buckets = new_capacity;
-        this->num_entries = 0;
-        this->num_collisions = 0;
-        this->max_chain_length = 0;
-        this->num_resizes++;
+        num_buckets = new_capacity;
+        num_entries = 0;
+        num_collisions = 0;
+        max_chain_length = 0;
+        num_resizes++;
 
-        this->set_load_factor();
+        recalculate_load_factor();
     }
 
-    int get_load_factor() const {
-        return this->load_factor;
+    double get_load_factor() const {
+        return load_factor_val;
     }
 
-    void set_load_factor() {
-        this->load_factor = this->num_entries / this->num_buckets;
+    void recalculate_load_factor() {
+        load_factor_val = static_cast<double>(num_entries) / static_cast<double>(num_buckets);
     }
 };
-
 
 #endif

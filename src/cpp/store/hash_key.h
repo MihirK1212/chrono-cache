@@ -2,49 +2,23 @@
 #define CHRONO_CACHE_SRC_CPP_STORE_HASH_KEY_H
 
 #include <string>
-#include <stdexcept>
+#include <type_traits>
 
 template<typename T>
-
 class ChronCacheHashKey {
-    private:
+    static_assert(
+        std::is_arithmetic<T>::value || std::is_same<T, std::string>::value,
+        "Key type must be arithmetic or std::string"
+    );
 
+    private:
     T raw_key;
     size_t hashed_key;
-
-    size_t hash_function(const T& key) const {
-        // allow only numerical and string keys
-        if(
-            !(
-                std::is_same<T, int>::value 
-                || std::is_same<T, std::string>::value
-                || std::is_same<T, float>::value 
-                || std::is_same<T, double>::value
-                || std::is_same<T, long>::value
-                || std::is_same<T, long long>::value
-                || std::is_same<T, unsigned int>::value
-                || std::is_same<T, unsigned long>::value
-                || std::is_same<T, unsigned long long>::value
-                || std::is_same<T, char>::value
-                || std::is_same<T, unsigned char>::value
-                || std::is_same<T, short>::value
-                || std::is_same<T, unsigned short>::value
-                || std::is_same<T, bool>::value
-                || std::is_same<T, long double>::value
-                || std::is_same<T, wchar_t>::value
-            )
-        ) {
-            throw std::runtime_error("Invalid key type");
-        }
-        return std::hash<T>()(key);
-    }
-
     public:
-    ChronCacheHashKey(const T& key) {
-        raw_key = key;
-        hashed_key = hash_function(key);
-    }
-    
+    ChronCacheHashKey(const T& key)
+        : raw_key(key)
+        , hashed_key(std::hash<T>()(key)) {}
+
     ~ChronCacheHashKey() = default;
 
     const size_t& get() const {
@@ -55,8 +29,6 @@ class ChronCacheHashKey {
         return raw_key;
     }
 
-    // purposley delete the copy and move constructors and operators
-    // this prevents double free errors
     ChronCacheHashKey(const ChronCacheHashKey&) = delete;
     ChronCacheHashKey& operator=(const ChronCacheHashKey&) = delete;
     ChronCacheHashKey(ChronCacheHashKey&&) = delete;

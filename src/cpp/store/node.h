@@ -9,16 +9,17 @@ struct ChronCacheNode {
     const size_t hashed_key;
     T_value value;
 
-    ChronCacheNode* next_in_bucket; // Next node in the same bucket
-    ChronCacheNode* prev_global;   // Previous node in global traversal
-    ChronCacheNode* next_global;   // Next node in global traversal
+    ChronCacheNode* next_in_bucket;
+    ChronCacheNode* prev_global;
+    ChronCacheNode* next_global;
 
-    ChronCacheNode(const T_key& key, const T_value& value) : 
-    key(key), hashed_key(ChronCacheHashKey<T_key>(key).get()), value(value) {
-        next_in_bucket = nullptr;
-        prev_global = nullptr;
-        next_global = nullptr;
-    }
+    ChronCacheNode(const T_key& key, const T_value& value)
+        : key(key)
+        , hashed_key(ChronCacheHashKey<T_key>(key).get())
+        , value(value)
+        , next_in_bucket(nullptr)
+        , prev_global(nullptr)
+        , next_global(nullptr) {}
 
     ~ChronCacheNode() = default;
 
@@ -34,15 +35,13 @@ struct ChronCacheNode {
         return value;
     }
 
-    void clear_node_pointers() {
+    void clear_pointers() {
         next_in_bucket = nullptr;
         prev_global = nullptr;
         next_global = nullptr;
     }
 
-    // purposley delete the copy and move constructors and operators
-    // this prevents double free errors
-    ChronCacheNode(const ChronCacheNode&) = delete; 
+    ChronCacheNode(const ChronCacheNode&) = delete;
     ChronCacheNode& operator=(const ChronCacheNode&) = delete;
     ChronCacheNode(ChronCacheNode&&) = delete;
     ChronCacheNode& operator=(ChronCacheNode&&) = delete;
