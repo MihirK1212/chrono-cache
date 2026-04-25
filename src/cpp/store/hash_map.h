@@ -41,10 +41,10 @@ class ChronCacheHashMap {
 };
 
 template<typename T_key, typename T_value>
-ChronCacheHashMap<T_key, T_value>::ChronCacheHashMap(int capacity, double load_factor_threshold)    {
+ChronCacheHashMap<T_key, T_value>::ChronCacheHashMap(int capacity, double load_factor_threshold)
+    : metrics(capacity) {
     this->load_factor_threshold = load_factor_threshold;
     this->reset_map_to_capacity(capacity);
-    this->metrics = ChronCacheHashMapMetrics(capacity);
 }
 
 template<typename T_key, typename T_value>
@@ -132,6 +132,8 @@ bool ChronCacheHashMap<T_key, T_value>::insert_into_bucket(
     this->bucketTailNode[bucketIndex] = newNode;
     this->bucketChainLength[bucketIndex]++;
     this->metrics.new_element_event(is_collision, this->bucketChainLength[bucketIndex]);
+
+    return true;
 }
 
 template<typename T_key, typename T_value>
