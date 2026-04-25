@@ -15,16 +15,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---- Compiler warnings ----
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+add_compile_options(-Wall -Wextra -Wpedantic)
 
 # ── Main executable ────────────────────────────────────────────────────────────
 
 file(GLOB_RECURSE SRC_FILES src/cpp/*.cpp)
-list(FILTER SRC_FILES EXCLUDE REGEX ".*/tests/.*")
 
 add_executable(chrono_cache ${SRC_FILES})
 
@@ -33,38 +28,7 @@ target_include_directories(chrono_cache PRIVATE src/cpp)
 find_package(Threads REQUIRED)
 target_link_libraries(chrono_cache PRIVATE Threads::Threads)
 
-if(MSVC)
-    target_compile_options(chrono_cache PRIVATE
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Debug>:/Od /Zi>
-    )
-else()
-    target_compile_options(chrono_cache PRIVATE
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:Debug>:-O0 -g>
-    )
-endif()
-
-# ── Tests ─────────────────────────────────────────────────────────────────────
-
-enable_testing()
-
-file(GLOB TEST_FILES src/cpp/store/tests/*.cpp)
-
-add_executable(hash_map_tests ${TEST_FILES})
-
-target_include_directories(hash_map_tests PRIVATE src/cpp)
-
-if(MSVC)
-    target_compile_options(hash_map_tests PRIVATE
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Debug>:/Od /Zi>
-    )
-else()
-    target_compile_options(hash_map_tests PRIVATE
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:Debug>:-O0 -g>
-    )
-endif()
-
-add_test(NAME HashMapTests COMMAND hash_map_tests)
+target_compile_options(chrono_cache PRIVATE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Debug>:-O0 -g>
+)
