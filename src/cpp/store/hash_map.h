@@ -5,45 +5,69 @@
 #include <vector>
 
 #include "node.h"
+#include "metrics.h"
 
 template<typename T_key, typename T_value>
 class ChronCacheHashMap {
     private:
     int capacity;
+    ChronCacheHashMapMetrics metrics;
+
+    double load_factor_threshold = 0.75;
 
     std::vector<ChronCacheNode<T_key, T_value>*> bucketHeadNode; 
     std::vector<ChronCacheNode<T_key, T_value>*> bucketTailNode;
+    std::vector<int> bucketChainLength;
 
     // Flattened global list: bucket 0 nodes -> bucket 1 nodes -> ... -> bucket N nodes
     ChronCacheNode<T_key, T_value>* globalHead = nullptr;
     ChronCacheNode<T_key, T_value>* globalTail = nullptr;
 
     public:
-    ChronCacheHashMap(int capacity);
+    ChronCacheHashMap(int capacity, double load_factor_threshold = 0.75);
+
+    void reset_map_to_capacity(int capacity);
+
+    bool insert_into_bucket(int bucketIndex, ChronCacheNode<T_key, T_value>* newNode);
 
     bool set(const T_key& key, const T_value& value);    
     T_value get(const T_key& key) const;
     bool remove(const T_key& key);
 
-    int get_bucket_index(const T_key& key) const;
+    void resize(int new_capacity);
+
+    int get_hashed_key(const T_key& key) const;
+    int get_bucket_index(const size_t& hashed_key) const;
 };
 
 template<typename T_key, typename T_value>
-ChronCacheHashMap<T_key, T_value>::ChronCacheHashMap(int capacity)
-    : capacity(capacity),
-      bucketHeadNode(capacity, nullptr),
-      bucketTailNode(capacity, nullptr) {
-};
-
+ChronCacheHashMap<T_key, T_value>::ChronCacheHashMap(int capacity, double load_factor_threshold)    {
+    this->load_factor_threshold = load_factor_threshold;
+    this->reset_map_to_capacity(capacity);
+    this->metrics = ChronCacheHashMapMetrics(capacity);
+}
 
 template<typename T_key, typename T_value>
-bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& value) {
-    ChronCacheNode<T_key, T_value>* newNode = new ChronCacheNode<T_key, T_value>(key, value);
-
-    int bucketIndex = get_bucket_index(key);
-    if(bucketIndex >= (int)this->bucketHeadNode.size()) {
-        throw std::runtime_error("Bucket index out of range");
+void ChronCacheHashMap<T_key, T_value>::reset_map_to_capacity(int capacity) {
+    bool is_power_of_2 = (capacity > 0) && ((capacity & (capacity - 1)) == 0);
+    if (!is_power_of_2) {
+        throw std::runtime_error("Capacity must be a power of 2");
     }
+    this->capacity = capacity;
+
+    this->globalHead = nullptr;
+    this->globalTail = nullptr;
+    this->bucketHeadNode = std::vector<ChronCacheNode<T_key, T_value>*>(capacity, nullptr);
+    this->bucketTailNode = std::vector<ChronCacheNode<T_key, T_value>*>(capacity, nullptr);
+    this->bucketChainLength = std::vector<int>(capacity, 0);
+}
+
+template<typename T_key, typename T_value>
+bool ChronCacheHashMap<T_key, T_value>::insert_into_bucket(
+    int bucketIndex, ChronCacheNode<T_key, T_value>* newNode
+) {
+    
+    bool is_collision = false;
 
     if (this->bucketHeadNode[bucketIndex] == nullptr) {
         // empty bucket
@@ -85,6 +109,8 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
             globalTail = newNode;
         }
     } else {
+        is_collision = true;
+
         // bucket already has nodes 
         ChronCacheNode<T_key, T_value>* oldTail = this->bucketTailNode[bucketIndex];
 
@@ -104,13 +130,44 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
     }
 
     this->bucketTailNode[bucketIndex] = newNode;
+    this->bucketChainLength[bucketIndex]++;
+    this->metrics.new_element_event(is_collision, this->bucketChainLength[bucketIndex]);
+}
+
+template<typename T_key, typename T_value>
+bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& value) {
+    int bucketIndex = get_bucket_index(get_hashed_key(key));
+    if(bucketIndex >= (int)this->bucketHeadNode.size()) {
+        throw std::runtime_error("Bucket index out of range");
+    }
+
+    // If key already exists, update in place
+    ChronCacheNode<T_key, T_value>* existing = this->bucketHeadNode[bucketIndex];
+    while (existing != nullptr) {
+        if (existing->key == key) {
+            existing->value = value;
+            return true;
+        }
+        existing = existing->next_in_bucket;
+    }
+
+    ChronCacheNode<T_key, T_value>* newNode = new ChronCacheNode<T_key, T_value>(key, value);
+
+    this->insert_into_bucket(bucketIndex, newNode);
+
+    // resize if load factor is greater than the threshold
+    double load_factor = this->metrics.get_load_factor();
+    if (load_factor > this->load_factor_threshold) {
+        this->resize(this->capacity * 2);
+    }
+
     return true;
 }
 
 
 template<typename T_key, typename T_value>
 T_value ChronCacheHashMap<T_key, T_value>::get(const T_key& key) const {
-    int bucketIndex = get_bucket_index(key);
+    int bucketIndex = get_bucket_index(get_hashed_key(key));
     if(bucketIndex >= (int)this->bucketHeadNode.size()) {
         throw std::runtime_error("Bucket index out of range");
     }
@@ -130,7 +187,7 @@ T_value ChronCacheHashMap<T_key, T_value>::get(const T_key& key) const {
 
 template<typename T_key, typename T_value>
 bool ChronCacheHashMap<T_key, T_value>::remove(const T_key& key) {
-    int bucketIndex = get_bucket_index(key);
+    int bucketIndex = get_bucket_index(get_hashed_key(key));
 
     if(bucketIndex >= (int)this->bucketHeadNode.size()) {
         throw std::runtime_error("Bucket index out of range");
@@ -172,6 +229,8 @@ bool ChronCacheHashMap<T_key, T_value>::remove(const T_key& key) {
             }
 
             delete current;
+            this->bucketChainLength[bucketIndex]--;
+            this->metrics.remove_element_event();
             return true;
         }
 
@@ -182,9 +241,44 @@ bool ChronCacheHashMap<T_key, T_value>::remove(const T_key& key) {
     return false;
 }
 
+template<typename T_key, typename T_value> 
+void ChronCacheHashMap<T_key, T_value>::resize(int new_capacity) {
+    if (new_capacity <= this->capacity) {
+        throw std::runtime_error("New capacity is less than the current capacity");
+    }
+    bool is_power_of_2 = (new_capacity > 0) && ((new_capacity & (new_capacity - 1)) == 0);
+    if (!is_power_of_2) {
+        throw std::runtime_error("New capacity must be a power of 2");
+    }
+
+    // DANGER: the nodes of the global chain for some time exist only as independent nodes outside of the hash map
+    ChronCacheNode<T_key, T_value>* current = this->globalHead;
+    
+    // reset everything to the new capacity
+    int old_capacity = this->capacity;
+    this->metrics.resize_event_triggered(old_capacity, new_capacity);
+    this->reset_map_to_capacity(new_capacity);
+
+    while (current != nullptr) {
+        current->clear_node_pointers(); // make the node independent of the global chain
+        int bucketIndex = get_bucket_index(current->get_hashed_key());
+        this->insert_into_bucket(bucketIndex, current);
+        current = current->next_global;
+    }
+}   
+
 template<typename T_key, typename T_value>
-int ChronCacheHashMap<T_key, T_value>::get_bucket_index(const T_key& key) const {
-    return int(ChronCacheHashKey<T_key>(key).get() % ((size_t)capacity)); 
+int ChronCacheHashMap<T_key, T_value>::get_hashed_key(const T_key& key) const {
+    return ChronCacheHashKey<T_key>(key).get_hashed_key();
+}
+
+template<typename T_key, typename T_value>
+int ChronCacheHashMap<T_key, T_value>::get_bucket_index(const size_t& hashed_key) const {
+    /*
+    Optimization trick:
+    since capacity is a power of 2, bucket_index = hash % capacity = (hash & (capacity - 1))
+    */
+    return int(hashed_key & ((size_t)capacity - 1)); 
 }
 
 #endif

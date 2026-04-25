@@ -6,13 +6,15 @@
 template<typename T_key, typename T_value>
 struct ChronCacheNode {
     const T_key key;
+    const size_t hashed_key;
     T_value value;
 
     ChronCacheNode* next_in_bucket; // Next node in the same bucket
     ChronCacheNode* prev_global;   // Previous node in global traversal
     ChronCacheNode* next_global;   // Next node in global traversal
 
-    ChronCacheNode(const T_key& key, const T_value& value) : key(key), value(value) {
+    ChronCacheNode(const T_key& key, const T_value& value) : 
+    key(key), hashed_key(ChronCacheHashKey<T_key>(key).get()), value(value) {
         next_in_bucket = nullptr;
         prev_global = nullptr;
         next_global = nullptr;
@@ -24,8 +26,18 @@ struct ChronCacheNode {
         return key;
     }
 
+    const size_t& get_hashed_key() const {
+        return hashed_key;
+    }
+
     const T_value& get_value() const {
         return value;
+    }
+
+    void clear_node_pointers() {
+        next_in_bucket = nullptr;
+        prev_global = nullptr;
+        next_global = nullptr;
     }
 
     // purposley delete the copy and move constructors and operators
