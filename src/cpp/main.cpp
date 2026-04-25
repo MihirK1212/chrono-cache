@@ -30,7 +30,7 @@ void run_hash_key_examples() {
 
 void run_hash_map_examples() {
     std::cout << "\n--- Hash Map Examples ---" << std::endl;
-    ChronCacheHashMap<std::string, std::string> string_map(10);
+    ChronCacheHashMap<std::string, std::string> string_map(16);
 
     // Set examples
     string_map.set("key1", "value1");
