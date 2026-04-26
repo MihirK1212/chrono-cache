@@ -1,6 +1,7 @@
 #ifndef CHRONO_CACHE_SRC_CPP_STORE_HASH_MAP_H
 #define CHRONO_CACHE_SRC_CPP_STORE_HASH_MAP_H
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,7 +50,7 @@ class ChronCacheHashMap {
     ChronCacheHashMap& operator=(ChronCacheHashMap&&) = delete;
 
     bool set(const T_key& key, const T_value& value);
-    T_value get(const T_key& key) const;
+    std::optional<T_value> get(const T_key& key) const;
     bool remove(const T_key& key);
     void resize(int new_capacity);
 };
@@ -88,7 +89,7 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
 }
 
 template<typename T_key, typename T_value>
-T_value ChronCacheHashMap<T_key, T_value>::get(const T_key& key) const {
+std::optional<T_value> ChronCacheHashMap<T_key, T_value>::get(const T_key& key) const {
     int bucket_index = compute_bucket_index(compute_hash(key));
 
     Node* node = find_in_bucket(bucket_index, key);
@@ -96,7 +97,7 @@ T_value ChronCacheHashMap<T_key, T_value>::get(const T_key& key) const {
         return node->value;
     }
 
-    throw std::runtime_error("Key not found");
+    return std::nullopt;
 }
 
 template<typename T_key, typename T_value>

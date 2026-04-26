@@ -17,18 +17,42 @@ endif()
 # ---- Compiler warnings ----
 add_compile_options(-Wall -Wextra -Wpedantic)
 
-# ── Main executable ────────────────────────────────────────────────────────────
+# ---- Core library ----
+add_library(chrono_cache_core
+    src/cpp/sorted_sets/sorted_set.cpp
+    src/cpp/sorted_sets/tree.cpp
+)
 
-file(GLOB_RECURSE SRC_FILES src/cpp/*.cpp)
+target_include_directories(chrono_cache_core PUBLIC src/cpp)
 
-add_executable(chrono_cache ${SRC_FILES})
+target_compile_options(chrono_cache_core PRIVATE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Debug>:-O0 -g>
+)
 
-target_include_directories(chrono_cache PRIVATE src/cpp)
+# ---- Main executable ----
+add_executable(chrono_cache src/cpp/main.cpp)
 
 find_package(Threads REQUIRED)
-target_link_libraries(chrono_cache PRIVATE Threads::Threads)
+target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads)
 
 target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Debug>:-O0 -g>
 )
+
+# ---- Tests ----
+enable_testing()
+
+add_executable(sorted_set_tests
+    src/cpp/sorted_sets/tests/sorted_set_tests.cpp
+)
+
+target_link_libraries(sorted_set_tests PRIVATE chrono_cache_core Threads::Threads)
+
+target_compile_options(sorted_set_tests PRIVATE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Debug>:-O0 -g>
+)
+
+add_test(NAME sorted_set_tests COMMAND sorted_set_tests)
