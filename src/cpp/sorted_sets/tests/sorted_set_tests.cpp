@@ -284,6 +284,103 @@ void test_deterministic_randomized_stress_against_reference() {
     }
 }
 
+void test_score_update_crosses_ranks() {
+    SortedSetsAPI api;
+
+    require(api.zadd("ranks", 10.0, "a"), "insert a");
+    require(api.zadd("ranks", 20.0, "b"), "insert b");
+    require(api.zadd("ranks", 30.0, "c"), "insert c");
+    require(api.zadd("ranks", 40.0, "d"), "insert d");
+    require(api.zadd("ranks", 50.0, "e"), "insert e");
+
+    expect_optional_int(api.zrank("ranks", "a"), 0, "a initial rank");
+    expect_optional_int(api.zrank("ranks", "e"), 4, "e initial rank");
+
+    // Move lowest-ranked member to the top
+    require(!api.zadd("ranks", 60.0, "a"), "update a to 60");
+    expect_optional_int(api.zrank("ranks", "b"), 0, "b rank after a moved up");
+    expect_optional_int(api.zrank("ranks", "c"), 1, "c rank after a moved up");
+    expect_optional_int(api.zrank("ranks", "d"), 2, "d rank after a moved up");
+    expect_optional_int(api.zrank("ranks", "e"), 3, "e rank after a moved up");
+    expect_optional_int(api.zrank("ranks", "a"), 4, "a rank after move to top");
+
+    // Move highest-ranked member to the bottom
+    require(!api.zadd("ranks", 5.0, "e"), "update e to 5");
+    expect_optional_int(api.zrank("ranks", "e"), 0, "e rank after move to bottom");
+    expect_optional_int(api.zrank("ranks", "b"), 1, "b rank after e moved down");
+    expect_optional_int(api.zrank("ranks", "c"), 2, "c rank after e moved down");
+    expect_optional_int(api.zrank("ranks", "d"), 3, "d rank after e moved down");
+    expect_optional_int(api.zrank("ranks", "a"), 4, "a rank after e moved down");
+}
+
+void test_monotonic_inserts_and_removals() {
+    // Purely ascending inserts stress right-right AVL rotations;
+    // purely descending inserts stress left-left AVL rotations.
+    SortedSetsAPI api;
+    const int N = 100;
+
+    for (int i = 0; i < N; i++) {
+        require(api.zadd("asc", static_cast<double>(i), "m" + std::to_string(i)), "asc insert");
+    }
+    for (int i = 0; i < N; i++) {
+        expect_optional_int(api.zrank("asc", "m" + std::to_string(i)), i, "asc rank of m" + std::to_string(i));
+    }
+
+    for (int i = N - 1; i >= 0; i--) {
+        require(api.zadd("desc", static_cast<double>(i), "m" + std::to_string(i)), "desc insert");
+    }
+    for (int i = 0; i < N; i++) {
+        expect_optional_int(api.zrank("desc", "m" + std::to_string(i)), i, "desc rank of m" + std::to_string(i));
+    }
+
+    // Remove every even-indexed element and check the surviving odd elements re-rank correctly
+    for (int i = 0; i < N; i += 2) {
+        require(api.zrem("asc", "m" + std::to_string(i)), "asc remove even");
+    }
+    int expected_rank = 0;
+    for (int i = 1; i < N; i += 2) {
+        expect_optional_int(
+            api.zrank("asc", "m" + std::to_string(i)),
+            expected_rank++,
+            "asc odd rank after removals for m" + std::to_string(i)
+        );
+    }
+}
+
+void test_empty_set_reuse() {
+    SortedSetsAPI api;
+
+    require(api.zadd("reuse", 1.0, "x"), "insert x");
+    require(api.zadd("reuse", 2.0, "y"), "insert y");
+    require(api.zadd("reuse", 3.0, "z"), "insert z");
+
+    require(api.zrem("reuse", "x"), "remove x");
+    require(api.zrem("reuse", "y"), "remove y");
+    require(api.zrem("reuse", "z"), "remove z");
+
+    // SortedSet object persists in the store but the tree is empty
+    expect_empty_score(api.zscore("reuse", "x"), "x score after set emptied");
+    expect_empty_rank(api.zrank("reuse", "x"), "x rank after set emptied");
+    require(!api.zrem("reuse", "x"), "zrem on emptied key should be false");
+
+    // Re-populate the same key with different members
+    require(api.zadd("reuse", 10.0, "p"), "re-add p");
+    require(api.zadd("reuse", 5.0, "q"), "re-add q");
+    require(api.zadd("reuse", 15.0, "r"), "re-add r");
+
+    expect_optional_double(api.zscore("reuse", "q"), 5.0,  "q score after reuse");
+    expect_optional_double(api.zscore("reuse", "p"), 10.0, "p score after reuse");
+    expect_optional_double(api.zscore("reuse", "r"), 15.0, "r score after reuse");
+
+    expect_optional_int(api.zrank("reuse", "q"), 0, "q rank after reuse");
+    expect_optional_int(api.zrank("reuse", "p"), 1, "p rank after reuse");
+    expect_optional_int(api.zrank("reuse", "r"), 2, "r rank after reuse");
+
+    expect_empty_score(api.zscore("reuse", "x"), "x absent after reuse");
+    expect_empty_score(api.zscore("reuse", "y"), "y absent after reuse");
+    expect_empty_score(api.zscore("reuse", "z"), "z absent after reuse");
+}
+
 void run_test(const std::string& name, void (*test)()) {
     test();
     std::cout << "[PASS] " << name << '\n';
@@ -298,6 +395,9 @@ int main() {
         run_test("score ordering, ties, and extreme values", test_score_ordering_ties_and_extreme_values);
         run_test("key isolation and removal rank updates", test_key_isolation_and_removal_reorders_ranks);
         run_test("large sequential insert/update/remove", test_large_sequential_insert_update_and_remove);
+        run_test("score update crosses ranks", test_score_update_crosses_ranks);
+        run_test("monotonic inserts and removals", test_monotonic_inserts_and_removals);
+        run_test("empty set reuse", test_empty_set_reuse);
         run_test("deterministic randomized stress", test_deterministic_randomized_stress_against_reference);
     } catch (const std::exception& error) {
         std::cerr << "[FAIL] " << error.what() << '\n';
