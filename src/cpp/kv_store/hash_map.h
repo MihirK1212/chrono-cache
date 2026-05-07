@@ -37,7 +37,9 @@ class ChronCacheHashMap {
     void unlink_from_global_chain(Node* node);
 
     void insert_into_bucket(int bucket_index, Node* node);
-    Node* insert_node(const T_key& key, const T_value* value);
+    Node* insert_node_impl(Node* new_node, const T_key& key);
+    Node* insert_node(const T_key& key);
+    Node* insert_node(const T_key& key, const T_value& value);
     void reset_to_capacity(int capacity);
     void destroy_all_nodes();
 
@@ -83,7 +85,7 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
         return true;
     }
 
-    insert_node(key, &value);
+    insert_node(key, value);
     return true;
 }
 
@@ -127,7 +129,7 @@ T_value* ChronCacheHashMap<T_key, T_value>::get_or_add(const T_key& key) {
         return existing;
     }
 
-    return &insert_node(key, nullptr)->value;
+    return &insert_node(key)->value;
 }
 
 template<typename T_key, typename T_value>
@@ -284,10 +286,9 @@ void ChronCacheHashMap<T_key, T_value>::unlink_from_global_chain(Node* node) {
 }
 
 template<typename T_key, typename T_value>
-ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node(
-    const T_key& key, const T_value* value
+ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node_impl(
+    Node* new_node, const T_key& key
 ) {
-    Node* new_node = (value != nullptr) ? new Node(key, *value) : new Node(key);
     int bucket_index = compute_bucket_index(compute_hash(key));
     insert_into_bucket(bucket_index, new_node);
 
@@ -296,6 +297,18 @@ ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node(
     }
 
     return new_node;
+}
+
+template<typename T_key, typename T_value>
+ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node(const T_key& key) {
+    return insert_node_impl(new Node(key), key);
+}
+
+template<typename T_key, typename T_value>
+ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node(
+    const T_key& key, const T_value& value
+) {
+    return insert_node_impl(new Node(key, value), key);
 }
 
 template<typename T_key, typename T_value>
