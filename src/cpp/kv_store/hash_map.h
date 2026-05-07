@@ -37,6 +37,7 @@ class ChronCacheHashMap {
     void unlink_from_global_chain(Node* node);
 
     void insert_into_bucket(int bucket_index, Node* node);
+    Node* insert_node(const T_key& key, const T_value* value);
     void reset_to_capacity(int capacity);
     void destroy_all_nodes();
 
@@ -82,13 +83,7 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
         return true;
     }
 
-    Node* new_node = new Node(key, value);
-    insert_into_bucket(bucket_index, new_node);
-
-    if (metrics.get_load_factor() > load_factor_threshold) {
-        resize(capacity * 2);
-    }
-
+    insert_node(key, &value);
     return true;
 }
 
@@ -132,15 +127,7 @@ T_value* ChronCacheHashMap<T_key, T_value>::get_or_add(const T_key& key) {
         return existing;
     }
 
-    Node* new_node = new Node(key);
-    int bucket_index = compute_bucket_index(compute_hash(key));
-    insert_into_bucket(bucket_index, new_node);
-
-    if (metrics.get_load_factor() > load_factor_threshold) {
-        resize(capacity * 2);
-    }
-
-    return &new_node->value;
+    return &insert_node(key, nullptr)->value;
 }
 
 template<typename T_key, typename T_value>
@@ -294,6 +281,21 @@ void ChronCacheHashMap<T_key, T_value>::unlink_from_global_chain(Node* node) {
     } else {
         global_tail = node->prev_global;
     }
+}
+
+template<typename T_key, typename T_value>
+ChronCacheNode<T_key, T_value>* ChronCacheHashMap<T_key, T_value>::insert_node(
+    const T_key& key, const T_value* value
+) {
+    Node* new_node = (value != nullptr) ? new Node(key, *value) : new Node(key);
+    int bucket_index = compute_bucket_index(compute_hash(key));
+    insert_into_bucket(bucket_index, new_node);
+
+    if (metrics.get_load_factor() > load_factor_threshold) {
+        resize(capacity * 2);
+    }
+
+    return new_node;
 }
 
 template<typename T_key, typename T_value>
