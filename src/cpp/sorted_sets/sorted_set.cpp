@@ -4,7 +4,7 @@ SortedSet::SortedSet() : tree(), member_score(SORTED_SET_INITIAL_MAP_CAPACITY) {
 
 SortedSetsAPI::SortedSetsAPI() : sorted_set_store(SORTED_SET_INITIAL_MAP_CAPACITY) {}
 
-SortedSet& SortedSetsAPI::get_or_create_set(const std::string& key) {
+SortedSet* SortedSetsAPI::get_or_create_set(const std::string& key) {
     return sorted_set_store.get_or_add(key);
 }
 
@@ -13,21 +13,21 @@ const SortedSet* SortedSetsAPI::find_set(const std::string& key) const {
 }
 
 bool SortedSetsAPI::zadd(const std::string& key, double score, const std::string& member) {
-    SortedSet& zset = get_or_create_set(key);
-    auto existing = zset.member_score.get(member);
+    SortedSet* zset = get_or_create_set(key);
+    auto existing = zset->member_score.get(member);
 
     if (existing.has_value()) {
         if (existing.value() == score) {
             return false;
         }
-        zset.tree.erase(AVLTreeNodeValue(member, existing.value()));
-        zset.tree.insert(AVLTreeNodeValue(member, score));
-        zset.member_score.set(member, score);
+        zset->tree.erase(AVLTreeNodeValue(member, existing.value()));
+        zset->tree.insert(AVLTreeNodeValue(member, score));
+        zset->member_score.set(member, score);
         return false; // updated key
     }
 
-    zset.tree.insert(AVLTreeNodeValue(member, score));
-    zset.member_score.set(member, score);
+    zset->tree.insert(AVLTreeNodeValue(member, score));
+    zset->member_score.set(member, score);
     return true;
 }
 

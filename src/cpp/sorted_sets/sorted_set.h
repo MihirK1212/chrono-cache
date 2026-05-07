@@ -19,7 +19,7 @@ struct SortedSet {
 class SortedSetsAPI {
     ChronCacheHashMap<std::string, SortedSet> sorted_set_store;
 
-    SortedSet& get_or_create_set(const std::string& key);
+    SortedSet* get_or_create_set(const std::string& key);
     const SortedSet* find_set(const std::string& key) const;
 
 public:

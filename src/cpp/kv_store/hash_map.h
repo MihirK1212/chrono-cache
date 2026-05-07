@@ -54,7 +54,7 @@ class ChronCacheHashMap {
     const T_value* get_ptr(const T_key& key) const;
     std::optional<T_value> get(const T_key& key);
     std::optional<T_value> get(const T_key& key) const;
-    T_value& get_or_add(const T_key& key);
+    T_value* get_or_add(const T_key& key);
     bool remove(const T_key& key);
     void resize(int new_capacity);
 };
@@ -126,10 +126,10 @@ std::optional<T_value> ChronCacheHashMap<T_key, T_value>::get(const T_key& key) 
 }
 
 template<typename T_key, typename T_value>
-T_value& ChronCacheHashMap<T_key, T_value>::get_or_add(const T_key& key) {
+T_value* ChronCacheHashMap<T_key, T_value>::get_or_add(const T_key& key) {
     T_value* existing = get_ptr(key);
     if (existing != nullptr) {
-        return *existing;
+        return existing;
     }
 
     Node* new_node = new Node(key);
@@ -140,7 +140,7 @@ T_value& ChronCacheHashMap<T_key, T_value>::get_or_add(const T_key& key) {
         resize(capacity * 2);
     }
 
-    return new_node->value;
+    return &new_node->value;
 }
 
 template<typename T_key, typename T_value>
