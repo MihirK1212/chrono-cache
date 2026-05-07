@@ -3,7 +3,6 @@
 
 #include <optional>
 #include <string>
-#include <unordered_map>
 
 #include "../kv_store/hash_map.h"
 #include "tree.h"
@@ -18,7 +17,7 @@ struct SortedSet {
 };
 
 class SortedSetsAPI {
-    std::unordered_map<std::string, SortedSet> sorted_set_store;
+    ChronCacheHashMap<std::string, SortedSet> sorted_set_store;
 
     SortedSet& get_or_create_set(const std::string& key);
     const SortedSet* find_set(const std::string& key) const;

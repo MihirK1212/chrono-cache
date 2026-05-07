@@ -2,18 +2,14 @@
 
 SortedSet::SortedSet() : tree(), member_score(SORTED_SET_INITIAL_MAP_CAPACITY) {}
 
-SortedSetsAPI::SortedSetsAPI() : sorted_set_store() {}
+SortedSetsAPI::SortedSetsAPI() : sorted_set_store(SORTED_SET_INITIAL_MAP_CAPACITY) {}
 
 SortedSet& SortedSetsAPI::get_or_create_set(const std::string& key) {
-    return sorted_set_store[key];
+    return sorted_set_store.get_or_add(key);
 }
 
 const SortedSet* SortedSetsAPI::find_set(const std::string& key) const {
-    auto iter = sorted_set_store.find(key);
-    if (iter == sorted_set_store.end()) {
-        return nullptr;
-    }
-    return &iter->second;
+    return sorted_set_store.get_ptr(key);
 }
 
 bool SortedSetsAPI::zadd(const std::string& key, double score, const std::string& member) {
@@ -48,19 +44,18 @@ std::optional<double> SortedSetsAPI::zscore(
 }
 
 bool SortedSetsAPI::zrem(const std::string& key, const std::string& member) {
-    auto iter = sorted_set_store.find(key);
-    if (iter == sorted_set_store.end()) {
+    SortedSet* zset = sorted_set_store.get_ptr(key);
+    if (zset == nullptr) {
         return false;
     }
 
-    SortedSet& zset = iter->second;
-    auto result = zset.member_score.get(member);
+    auto result = zset->member_score.get(member);
     if (!result.has_value()) {
         return false;
     }
 
-    zset.tree.erase(AVLTreeNodeValue(member, result.value()));
-    zset.member_score.remove(member);
+    zset->tree.erase(AVLTreeNodeValue(member, result.value()));
+    zset->member_score.remove(member);
     return true;
 }
 
