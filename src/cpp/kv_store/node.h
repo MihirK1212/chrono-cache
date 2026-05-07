@@ -21,6 +21,14 @@ struct ChronCacheNode {
         , prev_global(nullptr)
         , next_global(nullptr) {}
 
+    explicit ChronCacheNode(const T_key& key)
+        : key(key)
+        , hashed_key(ChronCacheHashKey<T_key>(key).get())
+        , value()
+        , next_in_bucket(nullptr)
+        , prev_global(nullptr)
+        , next_global(nullptr) {}
+
     ~ChronCacheNode() = default;
 
     const T_key& get_key() const {
