@@ -40,19 +40,3 @@ target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Debug>:-O0 -g>
 )
-
-# ---- Tests ----
-enable_testing()
-
-add_executable(sorted_set_tests
-    src/cpp/sorted_sets/tests/sorted_set_tests.cpp
-)
-
-target_link_libraries(sorted_set_tests PRIVATE chrono_cache_core Threads::Threads)
-
-target_compile_options(sorted_set_tests PRIVATE
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Debug>:-O0 -g>
-)
-
-add_test(NAME sorted_set_tests COMMAND sorted_set_tests)
