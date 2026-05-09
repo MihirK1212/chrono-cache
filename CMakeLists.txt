@@ -19,6 +19,7 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 # ---- Core library ----
 add_library(chrono_cache_core
+    src/cpp/chrono_cache.cpp
     src/cpp/sorted_sets/sorted_set.cpp
     src/cpp/sorted_sets/tree.cpp
 )
