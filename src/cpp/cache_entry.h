@@ -29,8 +29,6 @@ struct CacheEntry {
         return expires_at.has_value();
     }
 
-    // Returns remaining TTL, or nullopt if this entry has no TTL set.
-    // Callers should check is_expired() before calling this.
     std::optional<std::chrono::milliseconds> remaining_ttl() const {
         if (!expires_at) return std::nullopt;
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
