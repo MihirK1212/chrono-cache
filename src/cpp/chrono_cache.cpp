@@ -12,14 +12,26 @@ bool ChronoCache::set(const std::string& key, const std::string& value,
     return kv_store.set(key, entry);
 }
 
+// get, expire, pttl, and persist all follow the same pattern:
+// acquire the write lock, then operate via _unguarded methods under that lock.
+//
+// Why not use the public map API (get, remove) directly?
+// get_ptr_unguarded returns a raw pointer into the map's internal node. That pointer
+// is only valid while the stripe lock is held — a concurrent remove() on the same key
+// would delete the node and leave the pointer dangling before we even read is_expired().
+// Releasing the lock between the get and the remove is not safe, even with null checks:
+// a freed pointer is still non-null; dereferencing it is UB.
+//
+// The lock must be held for the entire sequence: get pointer → inspect → conditionally remove.
 std::optional<std::string> ChronoCache::get(const std::string& key) {
-    CacheEntry* entry = kv_store.get_ptr(key);
-    if (entry == nullptr) return std::nullopt;
-    if (entry->is_expired()) {
-        kv_store.remove(key);
-        return std::nullopt;
-    }
-    return entry->value;
+    std::optional<std::string> result;
+    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+        if (!e) return false;
+        if (e->is_expired()) return true;
+        result = e->value;
+        return false;
+    });
+    return result;
 }
 
 bool ChronoCache::del(const std::string& key) {
@@ -27,37 +39,38 @@ bool ChronoCache::del(const std::string& key) {
 }
 
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
-    CacheEntry* entry = kv_store.get_ptr(key);
-    if (entry == nullptr) return false;
-    if (entry->is_expired()) {
-        kv_store.remove(key);
+    bool found = false;
+    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+        if (!e) return false;
+        if (e->is_expired()) return true;
+        e->expires_at = CacheEntry::Clock::now() + ttl;
+        found = true;
         return false;
-    }
-    entry->expires_at = CacheEntry::Clock::now() + ttl;
-    return true;
+    });
+    return found;
 }
 
 long long ChronoCache::pttl(const std::string& key) {
-    CacheEntry* entry = kv_store.get_ptr(key);
-    if (entry == nullptr) return -2;
-    if (entry->is_expired()) {
-        kv_store.remove(key);
-        return -2;
-    }
-    if (!entry->has_ttl()) return -1;
-    auto remaining = entry->remaining_ttl();
-    return remaining->count();
+    long long result = -2;
+    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+        if (!e) return false;
+        if (e->is_expired()) return true;
+        result = e->has_ttl() ? e->remaining_ttl()->count() : -1;
+        return false;
+    });
+    return result;
 }
 
 bool ChronoCache::persist(const std::string& key) {
-    CacheEntry* entry = kv_store.get_ptr(key); 
-    if(entry == nullptr) return false; 
-    if(entry->is_expired()) {
-        kv_store.remove(key); 
-        return false;  
-    }
-    entry->expires_at = std::nullopt; 
-    return true; 
+    bool found = false;
+    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+        if (!e) return false;
+        if (e->is_expired()) return true;
+        e->expires_at = std::nullopt;
+        found = true;
+        return false;
+    });
+    return found;
 }
 
 bool ChronoCache::zadd(const std::string& key, double score, const std::string& member) {
