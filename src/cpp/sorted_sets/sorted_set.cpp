@@ -13,6 +13,7 @@ const SortedSet* SortedSetsAPI::find_set(const std::string& key) const {
 }
 
 bool SortedSetsAPI::zadd(const std::string& key, double score, const std::string& member) {
+    std::unique_lock lock(mtx);
     SortedSet* zset = get_or_create_set(key);
     auto existing = zset->member_score.get(member);
 
@@ -35,6 +36,7 @@ std::optional<double> SortedSetsAPI::zscore(
     const std::string& key,
     const std::string& member
 ) const {
+    std::shared_lock lock(mtx);
     const SortedSet* zset = find_set(key);
     if (zset == nullptr) {
         return std::nullopt;
@@ -44,6 +46,7 @@ std::optional<double> SortedSetsAPI::zscore(
 }
 
 bool SortedSetsAPI::zrem(const std::string& key, const std::string& member) {
+    std::unique_lock lock(mtx);
     SortedSet* zset = sorted_set_store.get_ptr(key);
     if (zset == nullptr) {
         return false;
@@ -60,6 +63,7 @@ bool SortedSetsAPI::zrem(const std::string& key, const std::string& member) {
 }
 
 std::optional<int> SortedSetsAPI::zrank(const std::string& key, const std::string& member) const {
+    std::shared_lock lock(mtx);
     const SortedSet* zset = find_set(key);
     if (zset == nullptr) {
         return std::nullopt;

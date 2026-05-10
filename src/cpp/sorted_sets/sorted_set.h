@@ -2,6 +2,7 @@
 #define SORTED_SET_H
 
 #include <optional>
+#include <shared_mutex>
 #include <string>
 
 #include "../kv_store/hash_map.h"
@@ -18,6 +19,7 @@ struct SortedSet {
 
 class SortedSetsAPI {
     ChronCacheHashMap<std::string, SortedSet> sorted_set_store;
+    mutable std::shared_mutex mtx;
 
     SortedSet* get_or_create_set(const std::string& key);
     const SortedSet* find_set(const std::string& key) const;
