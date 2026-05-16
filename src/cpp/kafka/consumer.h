@@ -2,7 +2,10 @@
 #define KAFKA_CONSUMER_H
 
 #include <string>
+#include <vector>
 #include <librdkafka/rdkafkacpp.h>
+
+#include "cache_event.h"
 
 class CacheEventsKafkaConsumer {
     const int NUM_PARTITIONS = 4;
@@ -21,10 +24,7 @@ class CacheEventsKafkaConsumer {
 
     ~CacheEventsKafkaConsumer();
 
-    std::vector<std::string> consume_all_events();
+    std::vector<CacheEvent> consume_all_events();
 };
-
-
-
 
 #endif

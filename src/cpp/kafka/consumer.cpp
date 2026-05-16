@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <nlohmann/json.hpp>
+
 #include "consumer.h"
 
 CacheEventsKafkaConsumer::CacheEventsKafkaConsumer(const std::string& brokers, const std::string& cache_events_topic) 
@@ -69,8 +71,8 @@ int CacheEventsKafkaConsumer::assign_all_partitions() {
     return num_partitions;
 }
 
-std::vector<std::string> CacheEventsKafkaConsumer::consume_all_events() {
-    std::vector<std::string> events;
+std::vector<CacheEvent> CacheEventsKafkaConsumer::consume_all_events() {
+    std::vector<CacheEvent> events;
     int num_partitions = assign_all_partitions(); 
     if (num_partitions <= 0) {
         std::cerr << "No partitions assigned" << std::endl;
@@ -86,18 +88,33 @@ std::vector<std::string> CacheEventsKafkaConsumer::consume_all_events() {
 
         switch (msg->err()) {
             case RdKafka::ERR_NO_ERROR: {
-                std::string payload(
-                    static_cast<const char*>(msg->payload()),
-                    msg->len()
-                );
-                std::cout << " Received event from [Partition "
-                          << msg->partition()
-                          << " | Offset "
-                          << msg->offset()
-                          << "] "
-                          << payload
-                          << std::endl;
-                events.push_back(payload);
+                std::string json_str(static_cast<const char*>(msg->payload()), msg->len());
+                try {
+                    nlohmann::json j = nlohmann::json::parse(json_str);
+                    CacheEvent event;
+                    event.type      = event_type_from_string(j.at("type").get<std::string>());
+                    event.key       = j.at("key").get<std::string>();
+                    event.value     = j.at("value").get<std::string>();
+                    event.ttl_ms    = j.at("ttl_ms").get<int64_t>();
+                    event.seq       = j.at("seq").get<uint64_t>();
+                    event.timestamp = j.at("timestamp").get<int64_t>();
+
+                    std::cout << " Received CacheEvent from [Partition "
+                              << msg->partition()
+                              << " | Offset "
+                              << msg->offset()
+                              << "] type=" << event_type_name(event.type)
+                              << " key=" << event.key
+                              << " value=" << event.value
+                              << std::endl;
+                    events.push_back(std::move(event));
+                } catch (const std::exception& e) {
+                    std::cerr << "Failed to parse CacheEvent from partition "
+                              << msg->partition()
+                              << " offset " << msg->offset()
+                              << ": " << e.what()
+                              << std::endl;
+                }
                 break;
             }
 

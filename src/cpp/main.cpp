@@ -6,6 +6,7 @@
 #include "chrono_cache.h"
 #include "kafka/producer.h"
 #include "kafka/consumer.h"
+#include "kafka/cache_event.h"
 
 static void print_pttl(ChronoCache& cache, const std::string& key) {
     long long ms = cache.pttl(key);
@@ -124,17 +125,39 @@ void runSortedSetOperations(ChronoCache& cache) {
 
 void runCacheEventsProducerOperations() {
     CacheEventsKafkaProducer producer("localhost:9092", "chrono-events");
-    producer.produce_random_message("key1", "value1_new_new");
-    // producer.produce_random_message("key2", "value2");
-    producer.produce_random_message("key3", "value3_new_new");
-    // producer.produce_random_message("key4", "value4_new");
+
+    CacheEvent event1;
+    event1.type      = EventType::SET;
+    event1.key       = "key1";
+    event1.value     = "value1_new_new";
+    event1.ttl_ms    = 0;
+    event1.seq       = 1;
+    event1.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    producer.produce_cache_event(event1);
+
+    CacheEvent event2;
+    event2.type      = EventType::SET;
+    event2.key       = "key3";
+    event2.value     = "value3_new_new";
+    event2.ttl_ms    = 0;
+    event2.seq       = 2;
+    event2.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    producer.produce_cache_event(event2);
 }
 
 void runCacheEventsConsumerOperations() {
     CacheEventsKafkaConsumer consumer("localhost:9092", "chrono-events");
-    std::vector<std::string> events = consumer.consume_all_events();
+    std::vector<CacheEvent> events = consumer.consume_all_events();
     for (const auto& event : events) {
-        std::cout << "Event: " << event << std::endl;
+        std::cout << "Event: type=" << event_type_name(event.type)
+                  << " key=" << event.key
+                  << " value=" << event.value
+                  << " ttl_ms=" << event.ttl_ms
+                  << " seq=" << event.seq
+                  << " timestamp=" << event.timestamp
+                  << std::endl;
     }
 }
 

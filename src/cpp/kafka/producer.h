@@ -4,6 +4,8 @@
 #include <string>
 #include <librdkafka/rdkafkacpp.h>
 
+#include "cache_event.h"
+
 class CacheEventsKafkaProducer {
     const std::string brokers;
     const std::string cache_events_topic; 
@@ -16,7 +18,7 @@ class CacheEventsKafkaProducer {
 
     ~CacheEventsKafkaProducer();
 
-    void produce_random_message(std::string key, std::string value);
+    void produce_cache_event(const CacheEvent& event);
 };
 
 #endif
