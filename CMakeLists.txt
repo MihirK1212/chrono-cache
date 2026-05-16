@@ -22,6 +22,8 @@ add_library(chrono_cache_core
     src/cpp/chrono_cache.cpp
     src/cpp/sorted_sets/sorted_set.cpp
     src/cpp/sorted_sets/tree.cpp
+    src/cpp/kafka/producer.cpp 
+    src/cpp/kafka/consumer.cpp
 )
 
 target_include_directories(chrono_cache_core PUBLIC src/cpp)
@@ -35,7 +37,13 @@ target_compile_options(chrono_cache_core PRIVATE
 add_executable(chrono_cache src/cpp/main.cpp)
 
 find_package(Threads REQUIRED)
-target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(RDKAFKA REQUIRED rdkafka++)
+
+target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads ${RDKAFKA_LIBRARIES})
+target_include_directories(chrono_cache PRIVATE ${RDKAFKA_INCLUDE_DIRS})
+target_compile_options(chrono_cache PRIVATE ${RDKAFKA_CFLAGS_OTHER})
 
 target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>

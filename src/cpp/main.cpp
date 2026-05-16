@@ -4,6 +4,8 @@
 #include <thread>
 
 #include "chrono_cache.h"
+#include "kafka/producer.h"
+#include "kafka/consumer.h"
 
 static void print_pttl(ChronoCache& cache, const std::string& key) {
     long long ms = cache.pttl(key);
@@ -12,10 +14,7 @@ static void print_pttl(ChronoCache& cache, const std::string& key) {
     else std::cout << "pttl(" << key << ") -> " << ms << " ms remaining\n";
 }
 
-int main() {
-    ChronoCache cache;
-
-    // --- Key-Value Store Operations ---
+void runKeyValueStoreOperations(ChronoCache& cache) {
     std::cout << "=== Key-Value Store ===" << std::endl;
 
     cache.set("name", "chrono-cache");
@@ -37,8 +36,9 @@ int main() {
 
     auto missing = cache.get("nonexistent");
     std::cout << "nonexistent key        -> " << missing.value_or("(nil)") << std::endl;
+}
 
-    // --- TTL Operations ---
+void runTtlOperations(ChronoCache& cache) {
     std::cout << "\n=== TTL (Time-To-Live) ===" << std::endl;
 
     // Basic TTL: key expires after 200 ms
@@ -91,8 +91,9 @@ int main() {
     print_pttl(cache, "overwrite_me");
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
     std::cout << "overwrite_me (after 250ms) -> " << cache.get("overwrite_me").value_or("(nil)") << "\n";
+}
 
-    // --- Sorted Set Operations ---
+void runSortedSetOperations(ChronoCache& cache) {
     std::cout << "\n=== Sorted Sets ===" << std::endl;
 
     cache.zadd("leaderboard", 1500.0, "alice");
@@ -119,6 +120,33 @@ int main() {
     std::cout << "\ncharlie score (after zrem) -> " << (charlie_score.has_value() ? std::to_string(charlie_score.value()) : "(nil)") << std::endl;
     std::cout << "bob     rank  (after zrem) -> " << cache.zrank("leaderboard", "bob").value() << std::endl;
     std::cout << "diana   rank  (after zrem) -> " << cache.zrank("leaderboard", "diana").value() << std::endl;
+}
+
+void runCacheEventsProducerOperations() {
+    CacheEventsKafkaProducer producer("localhost:9092", "chrono-events");
+    producer.produce_random_message("key1", "value1_new_new");
+    // producer.produce_random_message("key2", "value2");
+    producer.produce_random_message("key3", "value3_new_new");
+    // producer.produce_random_message("key4", "value4_new");
+}
+
+void runCacheEventsConsumerOperations() {
+    CacheEventsKafkaConsumer consumer("localhost:9092", "chrono-events");
+    std::vector<std::string> events = consumer.consume_all_events();
+    for (const auto& event : events) {
+        std::cout << "Event: " << event << std::endl;
+    }
+}
+
+int main() {
+    // ChronoCache cache;
+
+    // runKeyValueStoreOperations(cache);
+    // runTtlOperations(cache);
+    // runSortedSetOperations(cache);
+
+    // runCacheEventsProducerOperations();
+    runCacheEventsConsumerOperations();
 
     return 0;
 }
