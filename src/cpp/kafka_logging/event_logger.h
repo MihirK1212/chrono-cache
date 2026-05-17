@@ -4,12 +4,13 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include "../kv_store/hash_map.h"
 
 #include "producer.h"
 
 class CacheEventLogger {
     CacheEventsKafkaProducer producer;
-    std::unordered_map<std::string, uint64_t> seq_counters;
+    ChronCacheHashMap<std::string, uint64_t> seq_counters{16};
 
     uint64_t next_seq(const std::string& key);
     static int64_t now_ms();

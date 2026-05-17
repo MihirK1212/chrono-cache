@@ -7,11 +7,14 @@ CacheEventLogger::CacheEventLogger(const std::string& brokers, const std::string
     : producer(brokers, topic) {}
 
 void CacheEventLogger::set_seq_counters(std::unordered_map<std::string, uint64_t> last_applied_seq) {
-    seq_counters = std::move(last_applied_seq);
+    for (auto& [key, seq] : last_applied_seq) {
+        seq_counters.set(key, seq);
+    }
 }
 
 uint64_t CacheEventLogger::next_seq(const std::string& key) {
-    return ++seq_counters[key];
+    uint64_t* ptr = seq_counters.get_or_add(key);
+    return ++(*ptr);
 }
 
 int64_t CacheEventLogger::now_ms() {

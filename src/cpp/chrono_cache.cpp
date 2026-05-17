@@ -17,13 +17,11 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
         ? CacheEntry(value, *ttl)
         : CacheEntry(value);
 
-    bool result = kv_store.set(key, entry);
-
-    if (result && !disable_event_logging && cache_event_logger) {
-        cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : 0);
-    }
-    
-    return result;
+    return kv_store.set(key, entry, [&]() {
+        if (!disable_event_logging && cache_event_logger) {
+            cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : 0);
+        }
+    });
 }
 
 // get, expire, pttl, and persist all follow the same pattern:
@@ -51,13 +49,11 @@ std::optional<std::string> ChronoCache::get(const std::string& key)
 
 bool ChronoCache::del(const std::string& key) 
 {
-    bool result = kv_store.remove(key);
-
-    if (result && !disable_event_logging && cache_event_logger) {
-        cache_event_logger->log_del(key);
-    }
-
-    return result;
+    return kv_store.remove(key, [&]() {
+        if (!disable_event_logging && cache_event_logger) {
+            cache_event_logger->log_del(key);
+        }
+    });
 }
 
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
@@ -69,12 +65,11 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
         e->expires_at = CacheEntry::Clock::now() + ttl;
         current_value = e->value;
         found = true;
+        if (!disable_event_logging && cache_event_logger) {
+            cache_event_logger->log_expire(key, current_value, ttl.count());
+        }
         return false;
     });
-
-    if (found && !disable_event_logging && cache_event_logger) {
-        cache_event_logger->log_expire(key, current_value, ttl.count());
-    }
 
     return found;
 }
@@ -100,13 +95,12 @@ bool ChronoCache::persist(const std::string& key) {
         if (e->expires_at.has_value()) {
             e->expires_at = std::nullopt;
             current_value = e->value;
+            if (!disable_event_logging && cache_event_logger) {
+                cache_event_logger->log_persist(key, current_value);
+            }
         }
         return false;
     });
-
-    if (found && !disable_event_logging && cache_event_logger) {
-        cache_event_logger->log_persist(key, current_value);
-    }
 
     return found;
 }

@@ -83,12 +83,16 @@ class ChronCacheHashMap {
     ChronCacheHashMap& operator=(ChronCacheHashMap&&) = delete;
 
     bool set(const T_key& key, const T_value& value);
+    template<typename PostFn>
+    bool set(const T_key& key, const T_value& value, PostFn&& post_fn);
     T_value* get_ptr(const T_key& key);
     const T_value* get_ptr(const T_key& key) const;
     std::optional<T_value> get(const T_key& key);
     std::optional<T_value> get(const T_key& key) const;
     T_value* get_or_add(const T_key& key);
     bool remove(const T_key& key);
+    template<typename PostFn>
+    bool remove(const T_key& key, PostFn&& post_fn);
     void resize(int new_capacity);
 
     // Acquires a write lock for key, then calls fn(entry_ptr).
@@ -140,6 +144,25 @@ bool ChronCacheHashMap<T_key, T_value>::set(const T_key& key, const T_value& val
     {
         auto lock = acquire_write_lock(key);
         set_unguarded(key, value);
+        resize_needed = needs_resize();
+    }
+    if (resize_needed) {
+        std::unique_lock resize_guard(resize_lock);
+        if (needs_resize()) resize_impl(capacity * 2);
+    }
+    return true;
+}
+
+template<typename T_key, typename T_value>
+template<typename PostFn>
+bool ChronCacheHashMap<T_key, T_value>::set(
+    const T_key& key, const T_value& value, PostFn&& post_fn
+) {
+    bool resize_needed;
+    {
+        auto lock = acquire_write_lock(key);
+        set_unguarded(key, value);
+        std::forward<PostFn>(post_fn)();   
         resize_needed = needs_resize();
     }
     if (resize_needed) {
@@ -203,6 +226,15 @@ template<typename T_key, typename T_value>
 bool ChronCacheHashMap<T_key, T_value>::remove(const T_key& key) {
     auto lock = acquire_write_lock(key);
     return remove_unguarded(key);
+}
+
+template<typename T_key, typename T_value>
+template<typename PostFn>
+bool ChronCacheHashMap<T_key, T_value>::remove(const T_key& key, PostFn&& post_fn) {
+    auto lock = acquire_write_lock(key);
+    bool found = remove_unguarded(key);
+    if (found) std::forward<PostFn>(post_fn)(); 
+    return found;
 }
 
 template<typename T_key, typename T_value>

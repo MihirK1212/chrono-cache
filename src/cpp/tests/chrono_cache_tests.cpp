@@ -31,7 +31,7 @@
 using ms = std::chrono::milliseconds;
 
 // Global test configuration
-static const CacheConfig g_test_config("localhost:9092", "chrono-events", true);; // Disable logging for tests
+static const CacheConfig g_test_config("localhost:9092", "chrono-events", true); // Disable event logging for tests
 
 // =============================================================================
 // Minimal test framework
