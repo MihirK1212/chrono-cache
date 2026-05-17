@@ -5,21 +5,23 @@
 #include <string>
 #include <cstdint>
 
-enum class EventType { SET, DELETE, EXPIRE };
+enum class EventType { SET, DELETE, EXPIRE, PERSIST };
 
 inline std::string event_type_name(EventType t) {
     switch (t) {
-        case EventType::SET:    return "SET";
-        case EventType::DELETE: return "DELETE";
-        case EventType::EXPIRE: return "EXPIRE";
+        case EventType::SET:     return "SET";
+        case EventType::DELETE:  return "DELETE";
+        case EventType::EXPIRE:  return "EXPIRE";
+        case EventType::PERSIST: return "PERSIST";
     }
     return "UNKNOWN";
 }
 
 inline EventType event_type_from_string(const std::string& s) {
-    if (s == "SET")    return EventType::SET;
-    if (s == "DELETE") return EventType::DELETE;
-    if (s == "EXPIRE") return EventType::EXPIRE;
+    if (s == "SET")     return EventType::SET;
+    if (s == "DELETE")  return EventType::DELETE;
+    if (s == "EXPIRE")  return EventType::EXPIRE;
+    if (s == "PERSIST") return EventType::PERSIST;
     throw std::invalid_argument("Unknown EventType: " + s);
 }
 

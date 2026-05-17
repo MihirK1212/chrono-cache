@@ -1,15 +1,24 @@
 #include "chrono_cache.h"
 
-ChronoCache::ChronoCache()
+ChronoCache::ChronoCache(const CacheConfig& config)
     : kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
-    , sorted_sets() {}
+    , sorted_sets()
+    , cache_event_logger(config.kafka_brokers, config.kafka_cache_events_topic)
+    , cache_event_consumer(config.kafka_brokers, config.kafka_cache_events_topic) {}
 
-bool ChronoCache::set(const std::string& key, const std::string& value,
-                      std::optional<std::chrono::milliseconds> ttl) {
+bool ChronoCache::set(const std::string& key, const std::string& value, std::optional<std::chrono::milliseconds> ttl) 
+{
     CacheEntry entry = ttl.has_value()
         ? CacheEntry(value, *ttl)
         : CacheEntry(value);
-    return kv_store.set(key, entry);
+
+    bool result = kv_store.set(key, entry);
+
+    if (result) {
+        cache_event_logger.log_set(key, value, ttl.has_value() ? ttl->count() : 0);
+    }
+    
+    return result;
 }
 
 // get, expire, pttl, and persist all follow the same pattern:
@@ -23,7 +32,8 @@ bool ChronoCache::set(const std::string& key, const std::string& value,
 // a freed pointer is still non-null; dereferencing it is UB.
 //
 // The lock must be held for the entire sequence: get pointer → inspect → conditionally remove.
-std::optional<std::string> ChronoCache::get(const std::string& key) {
+std::optional<std::string> ChronoCache::get(const std::string& key) 
+{
     std::optional<std::string> result;
     kv_store.check_and_remove(key, [&](CacheEntry* e) {
         if (!e) return false;
@@ -34,19 +44,33 @@ std::optional<std::string> ChronoCache::get(const std::string& key) {
     return result;
 }
 
-bool ChronoCache::del(const std::string& key) {
-    return kv_store.remove(key);
+bool ChronoCache::del(const std::string& key) 
+{
+    bool result = kv_store.remove(key);
+
+    if (result) {
+        cache_event_logger.log_del(key);
+    }
+
+    return result;
 }
 
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
     bool found = false;
+    std::string current_value;
     kv_store.check_and_remove(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         e->expires_at = CacheEntry::Clock::now() + ttl;
+        current_value = e->value;
         found = true;
         return false;
     });
+
+    if (found) {
+        cache_event_logger.log_expire(key, current_value, ttl.count());
+    }
+
     return found;
 }
 
@@ -63,13 +87,22 @@ long long ChronoCache::pttl(const std::string& key) {
 
 bool ChronoCache::persist(const std::string& key) {
     bool found = false;
+    std::string current_value;
     kv_store.check_and_remove(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        e->expires_at = std::nullopt;
-        found = true;
+        found = true; 
+        if (e->expires_at.has_value()) {
+            e->expires_at = std::nullopt;
+            current_value = e->value;
+        }
         return false;
     });
+
+    if (found) {
+        cache_event_logger.log_persist(key, current_value);
+    }
+
     return found;
 }
 

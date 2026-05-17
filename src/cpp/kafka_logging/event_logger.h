@@ -1,5 +1,5 @@
-#ifndef KAFKA_EVENT_LOGGER_H
-#define KAFKA_EVENT_LOGGER_H
+#ifndef KAFKA_CACHE_EVENT_LOGGER_H
+#define KAFKA_CACHE_EVENT_LOGGER_H
 
 #include <cstdint>
 #include <string>
@@ -7,7 +7,7 @@
 
 #include "producer.h"
 
-class EventLogger {
+class CacheEventLogger {
     CacheEventsKafkaProducer producer;
     std::unordered_map<std::string, uint64_t> seq_counters;
 
@@ -15,14 +15,15 @@ class EventLogger {
     static int64_t now_ms();
 
 public:
-    EventLogger(const std::string& brokers, const std::string& topic);
+    CacheEventLogger(const std::string& brokers, const std::string& topic);
 
     // set seq counters after replay
     void set_seq_counters(std::unordered_map<std::string, uint64_t> last_applied_seq);
 
     void log_set(const std::string& key, const std::string& value, int64_t ttl_ms);
     void log_del(const std::string& key);
-    void log_expire(const std::string& key);
+    void log_expire(const std::string& key, const std::string& value, int64_t ttl_ms);
+    void log_persist(const std::string& key, const std::string& value);
 };
 
 #endif

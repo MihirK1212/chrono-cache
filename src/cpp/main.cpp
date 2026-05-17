@@ -124,14 +124,14 @@ void runSortedSetOperations(ChronoCache& cache) {
 }
 
 void runCacheEventsProducerOperations() {
-    EventLogger cacheEventsLogger("localhost:9092", "chrono-events");
+    CacheEventLogger cacheEventsLogger("localhost:9092", "chrono-events");
     cacheEventsLogger.log_set("key1", "value1", 0);
     cacheEventsLogger.log_set("key2", "value2", 0);
     cacheEventsLogger.log_set("key3", "value3", 0);
 }
 
 void runCacheEventsConsumerOperations() {
-    EventConsumer cacheEventsConsumer("localhost:9092", "chrono-events");
+    CacheEventConsumer cacheEventsConsumer("localhost:9092", "chrono-events");
     std::vector<CacheEvent> events = cacheEventsConsumer.consume_all_events();
     for (const auto& event : events) {
         std::cout << "Event: type=" << event_type_name(event.type)
