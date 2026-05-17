@@ -99,7 +99,7 @@ class ChronCacheHashMap {
     // fn receives T_value* (nullptr if the key is not in the map).
     // If fn returns true and the entry exists, it is removed under the same lock.
     template<typename Fn>
-    void check_and_remove(const T_key& key, Fn&& fn);
+    void get_and_remove_if(const T_key& key, Fn&& fn);
 };
 
 template<typename T_key, typename T_value>
@@ -525,7 +525,7 @@ bool ChronCacheHashMap<T_key, T_value>::needs_resize() const {
 
 template<typename T_key, typename T_value>
 template<typename Fn>
-void ChronCacheHashMap<T_key, T_value>::check_and_remove(const T_key& key, Fn&& fn) {
+void ChronCacheHashMap<T_key, T_value>::get_and_remove_if(const T_key& key, Fn&& fn) {
     auto lock = acquire_write_lock(key);
     T_value* entry = get_ptr_unguarded(key);
     if (std::forward<Fn>(fn)(entry) && entry != nullptr) {
