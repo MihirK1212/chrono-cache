@@ -18,8 +18,9 @@ class ChronoCache {
     ChronCacheHashMap<std::string, CacheEntry> kv_store;
     SortedSetsAPI sorted_sets;
 
-    CacheEventLogger cache_event_logger;
-    CacheEventConsumer cache_event_consumer;
+    bool disable_event_logging;
+    std::optional<CacheEventLogger> cache_event_logger;
+    std::optional<CacheEventConsumer> cache_event_consumer;
 
     public:
     

@@ -145,14 +145,15 @@ void runCacheEventsConsumerOperations() {
 }
 
 int main() {
-    // ChronoCache cache;
+    CacheConfig config("localhost:9092", "chrono-events", true);
+    ChronoCache cache(config);
 
-    // runKeyValueStoreOperations(cache);
-    // runTtlOperations(cache);
-    // runSortedSetOperations(cache);
+    runKeyValueStoreOperations(cache);
+    runTtlOperations(cache);
+    runSortedSetOperations(cache);
 
     // runCacheEventsProducerOperations();
-    runCacheEventsConsumerOperations();
+    // runCacheEventsConsumerOperations();
 
     return 0;
 }

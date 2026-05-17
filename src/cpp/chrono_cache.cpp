@@ -3,8 +3,13 @@
 ChronoCache::ChronoCache(const CacheConfig& config)
     : kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
     , sorted_sets()
-    , cache_event_logger(config.kafka_brokers, config.kafka_cache_events_topic)
-    , cache_event_consumer(config.kafka_brokers, config.kafka_cache_events_topic) {}
+    , disable_event_logging(config.disable_event_logging)
+    , cache_event_logger(config.disable_event_logging
+        ? std::nullopt
+        : std::make_optional<CacheEventLogger>(config.kafka_brokers, config.kafka_cache_events_topic))
+    , cache_event_consumer(config.disable_event_logging
+        ? std::nullopt
+        : std::make_optional<CacheEventConsumer>(config.kafka_brokers, config.kafka_cache_events_topic)) {}
 
 bool ChronoCache::set(const std::string& key, const std::string& value, std::optional<std::chrono::milliseconds> ttl) 
 {
@@ -14,8 +19,8 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
 
     bool result = kv_store.set(key, entry);
 
-    if (result) {
-        cache_event_logger.log_set(key, value, ttl.has_value() ? ttl->count() : 0);
+    if (result && !disable_event_logging && cache_event_logger) {
+        cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : 0);
     }
     
     return result;
@@ -48,8 +53,8 @@ bool ChronoCache::del(const std::string& key)
 {
     bool result = kv_store.remove(key);
 
-    if (result) {
-        cache_event_logger.log_del(key);
+    if (result && !disable_event_logging && cache_event_logger) {
+        cache_event_logger->log_del(key);
     }
 
     return result;
@@ -67,8 +72,8 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
         return false;
     });
 
-    if (found) {
-        cache_event_logger.log_expire(key, current_value, ttl.count());
+    if (found && !disable_event_logging && cache_event_logger) {
+        cache_event_logger->log_expire(key, current_value, ttl.count());
     }
 
     return found;
@@ -99,8 +104,8 @@ bool ChronoCache::persist(const std::string& key) {
         return false;
     });
 
-    if (found) {
-        cache_event_logger.log_persist(key, current_value);
+    if (found && !disable_event_logging && cache_event_logger) {
+        cache_event_logger->log_persist(key, current_value);
     }
 
     return found;
