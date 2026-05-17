@@ -61,4 +61,6 @@ void CacheEventsKafkaProducer::produce_cache_event(const CacheEvent& event) {
                   << " value=" << event.value
                   << std::endl;
     }
+
+    producer->poll(0);
 }

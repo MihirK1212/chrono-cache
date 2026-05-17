@@ -4,7 +4,7 @@
 #include <string>
 #include <librdkafka/rdkafkacpp.h>
 
-#include "cache_event.h"
+#include "../cache_event.h"
 
 class CacheEventsKafkaProducer {
     const std::string brokers;

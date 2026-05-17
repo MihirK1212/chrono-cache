@@ -4,9 +4,9 @@
 #include <thread>
 
 #include "chrono_cache.h"
-#include "kafka/producer.h"
-#include "kafka/consumer.h"
-#include "kafka/cache_event.h"
+#include "kafka_logging/event_logger.h"
+#include "kafka_logging/event_consumer.h"
+#include "cache_event.h"
 
 static void print_pttl(ChronoCache& cache, const std::string& key) {
     long long ms = cache.pttl(key);
@@ -124,32 +124,15 @@ void runSortedSetOperations(ChronoCache& cache) {
 }
 
 void runCacheEventsProducerOperations() {
-    CacheEventsKafkaProducer producer("localhost:9092", "chrono-events");
-
-    CacheEvent event1;
-    event1.type      = EventType::SET;
-    event1.key       = "key1";
-    event1.value     = "value1_new_new";
-    event1.ttl_ms    = 0;
-    event1.seq       = 1;
-    event1.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
-    producer.produce_cache_event(event1);
-
-    CacheEvent event2;
-    event2.type      = EventType::SET;
-    event2.key       = "key3";
-    event2.value     = "value3_new_new";
-    event2.ttl_ms    = 0;
-    event2.seq       = 2;
-    event2.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
-    producer.produce_cache_event(event2);
+    EventLogger cacheEventsLogger("localhost:9092", "chrono-events");
+    cacheEventsLogger.log_set("key1", "value1", 0);
+    cacheEventsLogger.log_set("key2", "value2", 0);
+    cacheEventsLogger.log_set("key3", "value3", 0);
 }
 
 void runCacheEventsConsumerOperations() {
-    CacheEventsKafkaConsumer consumer("localhost:9092", "chrono-events");
-    std::vector<CacheEvent> events = consumer.consume_all_events();
+    EventConsumer cacheEventsConsumer("localhost:9092", "chrono-events");
+    std::vector<CacheEvent> events = cacheEventsConsumer.consume_all_events();
     for (const auto& event : events) {
         std::cout << "Event: type=" << event_type_name(event.type)
                   << " key=" << event.key

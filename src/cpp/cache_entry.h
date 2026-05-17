@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 
+// custom chrono cache entry that wraps the value with the ttl mechanism
 struct CacheEntry {
     using Clock = std::chrono::steady_clock;
     using TimePoint = Clock::time_point;

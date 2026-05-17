@@ -1,5 +1,5 @@
-#ifndef KAFKA_CACHE_EVENT_H
-#define KAFKA_CACHE_EVENT_H
+#ifndef CACHE_EVENT_H
+#define CACHE_EVENT_H
 
 #include <stdexcept>
 #include <string>

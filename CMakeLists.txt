@@ -32,8 +32,10 @@ add_library(chrono_cache_core
     src/cpp/chrono_cache.cpp
     src/cpp/sorted_sets/sorted_set.cpp
     src/cpp/sorted_sets/tree.cpp
-    src/cpp/kafka/producer.cpp 
-    src/cpp/kafka/consumer.cpp
+    src/cpp/kafka_logging/producer.cpp
+    src/cpp/kafka_logging/consumer.cpp
+    src/cpp/kafka_logging/event_logger.cpp
+    src/cpp/kafka_logging/event_consumer.cpp
 )
 
 target_include_directories(chrono_cache_core PUBLIC src/cpp)
@@ -51,11 +53,14 @@ find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(RDKAFKA REQUIRED rdkafka++)
 
-target_link_libraries(chrono_cache_core PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(chrono_cache_core PUBLIC
+    nlohmann_json::nlohmann_json
+    ${RDKAFKA_LIBRARIES}
+)
+target_include_directories(chrono_cache_core PUBLIC ${RDKAFKA_INCLUDE_DIRS})
+target_compile_options(chrono_cache_core PUBLIC ${RDKAFKA_CFLAGS_OTHER})
 
-target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads ${RDKAFKA_LIBRARIES})
-target_include_directories(chrono_cache PRIVATE ${RDKAFKA_INCLUDE_DIRS})
-target_compile_options(chrono_cache PRIVATE ${RDKAFKA_CFLAGS_OTHER})
+target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads)
 
 target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>
