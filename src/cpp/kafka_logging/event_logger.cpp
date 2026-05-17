@@ -1,5 +1,4 @@
 #include <chrono>
-#include <utility>
 
 #include "event_logger.h"
 
@@ -13,6 +12,14 @@ void CacheEventLogger::set_seq_counters(std::unordered_map<std::string, uint64_t
 }
 
 uint64_t CacheEventLogger::next_seq(const std::string& key) {
+    /*
+    at first glance, this seems like a race condtion because get and incr are not atomic. 
+    but, the assumption is that next_seq will always be called inside log_<xyz> operations
+    and log_<xyz> operations are called inside the post_fn or the cond_fn callbacks of the hash map
+    and those callbacks are called while the stripe lock is held.
+    the same key always returns the same stripe lock, so no other key can be accessed while the lock is held.
+    hence, next_seq for a particular key is always called while its stripe lock is held, so no race condition exists.
+    */
     uint64_t* ptr = seq_counters.get_or_add(key);
     return ++(*ptr);
 }

@@ -7,7 +7,7 @@
 
 // custom chrono cache entry that wraps the value with the ttl mechanism
 struct CacheEntry {
-    using Clock = std::chrono::steady_clock;
+    using Clock = std::chrono::system_clock;
     using TimePoint = Clock::time_point;
 
     std::string value;
@@ -36,6 +36,18 @@ struct CacheEntry {
             *expires_at - Clock::now()
         );
         return remaining;
+    }
+
+    const std::string& get_value() const {
+        return value;
+    }
+
+    void update_ttl(std::chrono::milliseconds ttl) {
+        expires_at = Clock::now() + ttl;
+    }
+
+    void remove_ttl() {
+        expires_at = std::nullopt;
     }
 };
 

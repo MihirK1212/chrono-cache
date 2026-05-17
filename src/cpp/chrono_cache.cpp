@@ -41,7 +41,7 @@ std::optional<std::string> ChronoCache::get(const std::string& key)
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        result = e->value;
+        result = e->get_value();
         return false;
     });
     return result;
@@ -62,8 +62,8 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        e->expires_at = CacheEntry::Clock::now() + ttl;
-        current_value = e->value;
+        e->update_ttl(ttl);
+        current_value = e->get_value();
         found = true;
         if (!disable_event_logging && cache_event_logger) {
             cache_event_logger->log_expire(key, current_value, ttl.count());
@@ -92,9 +92,9 @@ bool ChronoCache::persist(const std::string& key) {
         if (!e) return false;
         if (e->is_expired()) return true;
         found = true; 
-        if (e->expires_at.has_value()) {
-            e->expires_at = std::nullopt;
-            current_value = e->value;
+        if (e->has_ttl()) {
+            e->remove_ttl();
+            current_value = e->get_value();
             if (!disable_event_logging && cache_event_logger) {
                 cache_event_logger->log_persist(key, current_value);
             }
