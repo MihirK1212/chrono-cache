@@ -38,7 +38,7 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
 std::optional<std::string> ChronoCache::get(const std::string& key) 
 {
     std::optional<std::string> result;
-    kv_store.get_and_remove_if(key, [&](CacheEntry* e) {
+    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         result = e->value;
@@ -59,7 +59,7 @@ bool ChronoCache::del(const std::string& key)
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
     bool found = false;
     std::string current_value;
-    kv_store.get_and_remove_if(key, [&](CacheEntry* e) {
+    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         e->expires_at = CacheEntry::Clock::now() + ttl;
@@ -76,7 +76,7 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
 
 long long ChronoCache::pttl(const std::string& key) {
     long long result = -2;
-    kv_store.get_and_remove_if(key, [&](CacheEntry* e) {
+    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         result = e->has_ttl() ? e->remaining_ttl()->count() : -1;
@@ -88,7 +88,7 @@ long long ChronoCache::pttl(const std::string& key) {
 bool ChronoCache::persist(const std::string& key) {
     bool found = false;
     std::string current_value;
-    kv_store.get_and_remove_if(key, [&](CacheEntry* e) {
+    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         found = true; 

@@ -129,7 +129,7 @@ public:
     }
 
     template<typename Fn>
-    void get_and_remove_if(const T_key& key, Fn&& cond_fn) {
+    void process_and_remove_if(const T_key& key, Fn&& cond_fn) {
         auto lock = acquire_write_lock(key);
         T_value* entry = kv_store.get_ptr(key);
         if (std::forward<Fn>(cond_fn)(entry) && entry != nullptr) {
