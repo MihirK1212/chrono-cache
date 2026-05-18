@@ -24,17 +24,6 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
     });
 }
 
-// get, expire, pttl, and persist all follow the same pattern:
-// acquire the write lock, then operate via _unguarded methods under that lock.
-//
-// Why not use the public map API (get, remove) directly?
-// get_ptr_unguarded returns a raw pointer into the map's internal node. That pointer
-// is only valid while the stripe lock is held — a concurrent remove() on the same key
-// would delete the node and leave the pointer dangling before we even read is_expired().
-// Releasing the lock between the get and the remove is not safe, even with null checks:
-// a freed pointer is still non-null; dereferencing it is UB.
-//
-// The lock must be held for the entire sequence: get pointer → inspect → conditionally remove.
 std::optional<std::string> ChronoCache::get(const std::string& key) 
 {
     std::optional<std::string> result;

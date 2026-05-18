@@ -130,6 +130,7 @@ public:
 
     template<typename Fn>
     void process_and_remove_if(const T_key& key, Fn&& cond_fn) {
+        // this method is used to process the entry and remove it (thread safely) if the condition is met
         auto lock = acquire_write_lock(key);
         T_value* entry = kv_store.get_ptr(key);
         if (std::forward<Fn>(cond_fn)(entry) && entry != nullptr) {
