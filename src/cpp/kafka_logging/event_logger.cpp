@@ -45,7 +45,7 @@ void CacheEventLogger::log_del(const std::string& key) {
     CacheEvent event;
     event.type      = EventType::DELETE;
     event.key       = key;
-    event.ttl_ms    = 0;
+    event.ttl_ms    = -1;
     event.seq       = next_seq(key);
     event.timestamp = now_ms();
     producer.produce_cache_event(event);
@@ -67,7 +67,7 @@ void CacheEventLogger::log_persist(const std::string& key, const std::string& va
     event.type      = EventType::PERSIST;
     event.key       = key;
     event.value     = value;
-    event.ttl_ms    = 0;
+    event.ttl_ms    = -1;
     event.seq       = next_seq(key);
     event.timestamp = now_ms();
     producer.produce_cache_event(event);

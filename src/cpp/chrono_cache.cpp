@@ -1,9 +1,14 @@
+#include <stdexcept>
+#include <unordered_map>
+
 #include "chrono_cache.h"
 
+
 ChronoCache::ChronoCache(const CacheConfig& config)
-    : kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
+    : state(ChronoCacheState::UNINITIALIZED)
+    , kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
     , sorted_sets()
-    , disable_event_logging(config.disable_event_logging)
+    , disable_event_logging(config.disable_event_logging) 
     , cache_event_logger(config.disable_event_logging
         ? std::nullopt
         : std::make_optional<CacheEventLogger>(config.kafka_brokers, config.kafka_cache_events_topic))
@@ -11,21 +16,39 @@ ChronoCache::ChronoCache(const CacheConfig& config)
         ? std::nullopt
         : std::make_optional<CacheEventConsumer>(config.kafka_brokers, config.kafka_cache_events_topic)) {}
 
+bool ChronoCache::is_logging_allowed() const {
+    return !disable_event_logging && cache_event_logger && state == ChronoCacheState::READY;
+}
+
+bool ChronoCache::is_accepting_ops() const {
+    return state == ChronoCacheState::READY || state == ChronoCacheState::REPLAYING;
+}
+
+void ChronoCache::check_accepting_ops() {
+    if(!is_accepting_ops()) {
+        throw std::runtime_error("ChronoCache is not ready to accept operations");
+    }
+}
+
 bool ChronoCache::set(const std::string& key, const std::string& value, std::optional<std::chrono::milliseconds> ttl) 
 {
+    check_accepting_ops();
+
     CacheEntry entry = ttl.has_value()
         ? CacheEntry(value, *ttl)
         : CacheEntry(value);
 
     return kv_store.set(key, entry, [&]() {
-        if (!disable_event_logging && cache_event_logger) {
-            cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : 0);
+        if (is_logging_allowed()) {
+            cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : -1);
         }
     });
 }
 
 std::optional<std::string> ChronoCache::get(const std::string& key) 
 {
+    check_accepting_ops();
+
     std::optional<std::string> result;
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
@@ -38,14 +61,22 @@ std::optional<std::string> ChronoCache::get(const std::string& key)
 
 bool ChronoCache::del(const std::string& key) 
 {
+    check_accepting_ops();
+
     return kv_store.remove(key, [&]() {
-        if (!disable_event_logging && cache_event_logger) {
+        if (is_logging_allowed()) {
             cache_event_logger->log_del(key);
         }
     });
 }
 
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
+    check_accepting_ops();
+
+    if(ttl.count() <= 0) {
+        throw std::invalid_argument("TTL must be greater than 0");
+    }
+
     bool found = false;
     std::string current_value;
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
@@ -54,7 +85,7 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
         e->update_ttl(ttl);
         current_value = e->get_value();
         found = true;
-        if (!disable_event_logging && cache_event_logger) {
+        if (is_logging_allowed()) {
             cache_event_logger->log_expire(key, current_value, ttl.count());
         }
         return false;
@@ -64,6 +95,8 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
 }
 
 long long ChronoCache::pttl(const std::string& key) {
+    check_accepting_ops();
+
     long long result = -2;
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
@@ -75,6 +108,8 @@ long long ChronoCache::pttl(const std::string& key) {
 }
 
 bool ChronoCache::persist(const std::string& key) {
+    check_accepting_ops();
+
     bool found = false;
     std::string current_value;
     kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
@@ -84,7 +119,7 @@ bool ChronoCache::persist(const std::string& key) {
         if (e->has_ttl()) {
             e->remove_ttl();
             current_value = e->get_value();
-            if (!disable_event_logging && cache_event_logger) {
+            if (is_logging_allowed()) {
                 cache_event_logger->log_persist(key, current_value);
             }
         }
@@ -95,17 +130,112 @@ bool ChronoCache::persist(const std::string& key) {
 }
 
 bool ChronoCache::zadd(const std::string& key, double score, const std::string& member) {
+    check_accepting_ops();
+
     return sorted_sets.zadd(key, score, member);
 }
 
 std::optional<double> ChronoCache::zscore(const std::string& key, const std::string& member) const {
+    (const_cast<ChronoCache*>(this))->check_accepting_ops();
+
     return sorted_sets.zscore(key, member);
 }
 
 bool ChronoCache::zrem(const std::string& key, const std::string& member) {
+    check_accepting_ops();
+
     return sorted_sets.zrem(key, member);
 }
 
 std::optional<int> ChronoCache::zrank(const std::string& key, const std::string& member) const {
+    (const_cast<ChronoCache*>(this))->check_accepting_ops();
+
     return sorted_sets.zrank(key, member);
+}
+
+
+void ChronoCache::replay_impl() {
+    std::vector<CacheEvent> events = cache_event_consumer->consume_all_events();
+
+    std::unordered_map<std::string, uint64_t> last_applied_seq;
+
+    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+
+    for (CacheEvent& event : events) {
+        const std::string& key   = event.key;
+        const std::string& value = event.value;
+        int64_t  ttl_ms = event.ttl_ms;
+        uint64_t seq    = event.seq;
+
+        if (last_applied_seq[key] >= seq) {
+            continue;
+        }
+        last_applied_seq[key] = seq;
+
+        switch (event.type) {
+            case EventType::SET: {
+                if (ttl_ms > 0) {
+                    int64_t expires_at_ms = event.timestamp + ttl_ms;
+                    if (expires_at_ms <= now_ms) break; // expired during downtime 
+                    int64_t remaining_ms = expires_at_ms - now_ms;
+                    this->set(key, value, std::chrono::milliseconds(remaining_ms));
+                } else {
+                    this->set(key, value, std::nullopt);
+                }
+                break;
+            }
+
+            case EventType::DELETE: {
+                this->del(key);
+                break;
+            }
+
+            case EventType::EXPIRE: {
+                int64_t expires_at_ms = event.timestamp + ttl_ms;
+                if (expires_at_ms <= now_ms) break; // expired during downtime 
+                int64_t remaining_ms = expires_at_ms - now_ms;
+                this->set(key, value, std::chrono::milliseconds(remaining_ms));
+                break;
+            }
+
+            case EventType::PERSIST: {
+                this->set(key, value, std::nullopt);
+                break;
+            }
+
+            default: {
+                throw std::logic_error("Unknown event type");
+            }
+        }
+    }
+
+    cache_event_logger->set_seq_counters(last_applied_seq);
+}
+
+bool ChronoCache::replay() {
+    if(state != ChronoCacheState::UNINITIALIZED) {
+        throw std::runtime_error("ChronoCache is not uninitialized, cannot replay");
+    }
+
+    state = ChronoCacheState::REPLAYING;
+
+    try {
+        replay_impl();
+    } catch (const std::exception& e) {
+        state = ChronoCacheState::REPLAY_FAILED;
+        throw;
+    }
+
+    state = ChronoCacheState::REPLAY_SUCCESS;
+    return true;
+}
+
+void ChronoCache::make_ready(bool force) {
+    if(!(state == ChronoCacheState::REPLAY_SUCCESS) && !(state == ChronoCacheState::REPLAY_FAILED && force)) {
+        throw std::runtime_error("ChronoCache is not in a state to make ready");
+    }
+
+    state = ChronoCacheState::READY;
 }

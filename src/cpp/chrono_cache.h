@@ -11,10 +11,13 @@
 #include "kafka_logging/event_logger.h"
 #include "kafka_logging/event_consumer.h"
 #include "cache_config.h"
+#include "cache_state.h"
 
 static constexpr int CHRONO_CACHE_INITIAL_CAPACITY = 16;
 
 class ChronoCache {
+    ChronoCacheState state;
+
     ChronCacheHashMap<std::string, CacheEntry> kv_store;
     SortedSetsAPI sorted_sets;
 
@@ -22,8 +25,15 @@ class ChronoCache {
     std::optional<CacheEventLogger> cache_event_logger;
     std::optional<CacheEventConsumer> cache_event_consumer;
 
+    bool is_logging_allowed() const; 
+    bool is_accepting_ops() const;
+
+    void check_accepting_ops();
+
+    void replay_impl();
+
     public:
-    
+
     ChronoCache(const CacheConfig& config);
 
     bool set(const std::string& key, const std::string& value,
@@ -43,6 +53,9 @@ class ChronoCache {
     std::optional<double> zscore(const std::string& key, const std::string& member) const;
     bool zrem(const std::string& key, const std::string& member);
     std::optional<int> zrank(const std::string& key, const std::string& member) const;
+
+    bool replay();
+    void make_ready(bool force = false);
 };
 
 #endif

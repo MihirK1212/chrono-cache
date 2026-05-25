@@ -148,6 +148,18 @@ int main() {
     CacheConfig config("localhost:9092", "chrono-events", true);
     ChronoCache cache(config);
 
+    try {
+        bool success = cache.replay();
+        if (!success) {
+            std::cerr << "Error: Failed to replay cache" << std::endl;
+            return 1;    
+        }
+        cache.make_ready();
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
     runKeyValueStoreOperations(cache);
     runTtlOperations(cache);
     runSortedSetOperations(cache);
