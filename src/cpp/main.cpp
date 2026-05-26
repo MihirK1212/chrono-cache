@@ -7,6 +7,7 @@
 #include "kafka_logging/event_logger.h"
 #include "kafka_logging/event_consumer.h"
 #include "cache_event.h"
+#include "cli.h"
 
 static void print_pttl(ChronoCache& cache, const std::string& key) {
     long long ms = cache.pttl(key);
@@ -145,24 +146,28 @@ void runCacheEventsConsumerOperations() {
 }
 
 int main() {
-    CacheConfig config("localhost:9092", "chrono-events", true);
-    ChronoCache cache(config);
+    CacheConfig config("localhost:9092", "chrono-events", false);
 
-    try {
-        bool success = cache.replay();
-        if (!success) {
-            std::cerr << "Error: Failed to replay cache" << std::endl;
-            return 1;    
-        }
-        cache.make_ready();
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
+    ChronoCacheCLI cli(config);
+    cli.run();
+    
+    // ChronoCache cache(config);
 
-    runKeyValueStoreOperations(cache);
-    runTtlOperations(cache);
-    runSortedSetOperations(cache);
+    // try {
+    //     bool success = cache.replay();
+    //     if (!success) {
+    //         std::cerr << "Error: Failed to replay cache" << std::endl;
+    //         return 1;    
+    //     }
+    //     cache.make_ready_after_replay();
+    // } catch (const std::exception& e) {
+    //     std::cerr << "Error: " << e.what() << std::endl;
+    //     return 1;
+    // }
+
+    // runKeyValueStoreOperations(cache);
+    // runTtlOperations(cache);
+    // runSortedSetOperations(cache);
 
     // runCacheEventsProducerOperations();
     // runCacheEventsConsumerOperations();

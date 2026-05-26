@@ -18,23 +18,24 @@ static constexpr int CHRONO_CACHE_INITIAL_CAPACITY = 16;
 class ChronoCache {
     ChronoCacheState state;
 
-    ChronCacheHashMap<std::string, CacheEntry> kv_store;
+    ChronCacheHashMap<std::string, CacheEntry> hash_map;
     SortedSetsAPI sorted_sets;
 
     bool disable_event_logging;
     std::optional<CacheEventLogger> cache_event_logger;
     std::optional<CacheEventConsumer> cache_event_consumer;
 
-    bool is_logging_allowed() const; 
-    bool is_accepting_ops() const;
-
+    bool is_logging_allowed() const;
     void check_accepting_ops();
-
-    void replay_impl();
+    void replay();
 
     public:
 
     ChronoCache(const CacheConfig& config);
+
+    bool is_accepting_ops() const;
+
+    bool init(bool with_replay);
 
     bool set(const std::string& key, const std::string& value,
              std::optional<std::chrono::milliseconds> ttl = std::nullopt);
@@ -53,9 +54,6 @@ class ChronoCache {
     std::optional<double> zscore(const std::string& key, const std::string& member) const;
     bool zrem(const std::string& key, const std::string& member);
     std::optional<int> zrank(const std::string& key, const std::string& member) const;
-
-    bool replay();
-    void make_ready(bool force = false);
 };
 
 #endif

@@ -6,7 +6,7 @@
 
 ChronoCache::ChronoCache(const CacheConfig& config)
     : state(ChronoCacheState::UNINITIALIZED)
-    , kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
+    , hash_map(CHRONO_CACHE_INITIAL_CAPACITY)
     , sorted_sets()
     , disable_event_logging(config.disable_event_logging) 
     , cache_event_logger(config.disable_event_logging
@@ -38,7 +38,7 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
         ? CacheEntry(value, *ttl)
         : CacheEntry(value);
 
-    return kv_store.set(key, entry, [&]() {
+    return hash_map.set(key, entry, [&]() {
         if (is_logging_allowed()) {
             cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : -1);
         }
@@ -50,7 +50,7 @@ std::optional<std::string> ChronoCache::get(const std::string& key)
     check_accepting_ops();
 
     std::optional<std::string> result;
-    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         result = e->get_value();
@@ -63,7 +63,7 @@ bool ChronoCache::del(const std::string& key)
 {
     check_accepting_ops();
 
-    return kv_store.remove(key, [&]() {
+    return hash_map.remove(key, [&]() {
         if (is_logging_allowed()) {
             cache_event_logger->log_del(key);
         }
@@ -79,7 +79,7 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
 
     bool found = false;
     std::string current_value;
-    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         e->update_ttl(ttl);
@@ -98,7 +98,7 @@ long long ChronoCache::pttl(const std::string& key) {
     check_accepting_ops();
 
     long long result = -2;
-    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         result = e->has_ttl() ? e->remaining_ttl()->count() : -1;
@@ -112,7 +112,7 @@ bool ChronoCache::persist(const std::string& key) {
 
     bool found = false;
     std::string current_value;
-    kv_store.process_and_remove_if(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         found = true; 
@@ -154,7 +154,7 @@ std::optional<int> ChronoCache::zrank(const std::string& key, const std::string&
 }
 
 
-void ChronoCache::replay_impl() {
+void ChronoCache::replay() {
     std::vector<CacheEvent> events = cache_event_consumer->consume_all_events();
 
     std::unordered_map<std::string, uint64_t> last_applied_seq;
@@ -214,28 +214,27 @@ void ChronoCache::replay_impl() {
     cache_event_logger->set_seq_counters(last_applied_seq);
 }
 
-bool ChronoCache::replay() {
-    if(state != ChronoCacheState::UNINITIALIZED) {
-        throw std::runtime_error("ChronoCache is not uninitialized, cannot replay");
+bool ChronoCache::init(bool with_replay) {
+    if (state != ChronoCacheState::UNINITIALIZED) {
+        throw std::runtime_error("ChronoCache::init() requires UNINITIALIZED state");
+    }
+
+    if (!with_replay) {
+        state = ChronoCacheState::READY;
+        return true;
+    }
+
+    if (disable_event_logging) {
+        throw std::runtime_error("Cannot replay: event logging is disabled in config");
     }
 
     state = ChronoCacheState::REPLAYING;
-
     try {
-        replay_impl();
-    } catch (const std::exception& e) {
+        replay();
+        state = ChronoCacheState::READY;
+        return true;
+    } catch (const std::exception&) {
         state = ChronoCacheState::REPLAY_FAILED;
         throw;
     }
-
-    state = ChronoCacheState::REPLAY_SUCCESS;
-    return true;
-}
-
-void ChronoCache::make_ready(bool force) {
-    if(!(state == ChronoCacheState::REPLAY_SUCCESS) && !(state == ChronoCacheState::REPLAY_FAILED && force)) {
-        throw std::runtime_error("ChronoCache is not in a state to make ready");
-    }
-
-    state = ChronoCacheState::READY;
 }
