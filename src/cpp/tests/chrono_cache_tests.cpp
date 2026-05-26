@@ -103,6 +103,7 @@ static void sleep_ms(long long ms_val) {
 static void test_set_get_basic() {
     run_suite("set/get — basic", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Fresh key
         ASSERT_TRUE(c.set("foo", "bar"));
@@ -183,6 +184,7 @@ static void test_set_get_basic() {
 static void test_set_get_ttl() {
     run_suite("set/get — TTL & expiry", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Key is immediately visible when TTL > elapsed
         c.set("alive", "yes", ms(5000));
@@ -225,6 +227,7 @@ static void test_set_get_ttl() {
 static void test_del() {
     run_suite("del", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Delete existing key
         c.set("d1", "val");
@@ -268,6 +271,7 @@ static void test_del() {
 static void test_expire() {
     run_suite("expire", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Setting TTL on an existing, non-expired key returns true
         c.set("e1", "val");
@@ -309,6 +313,7 @@ static void test_expire() {
 static void test_persist() {
     run_suite("persist", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // persist removes TTL — key survives after original TTL would have elapsed
         c.set("p1", "val", ms(100));
@@ -348,6 +353,7 @@ static void test_persist() {
 static void test_pttl() {
     run_suite("pttl", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Non-existent key → -2
         ASSERT_EQ(c.pttl("missing"), -2LL);
@@ -392,6 +398,7 @@ static void test_pttl() {
 static void test_sorted_set_basic() {
     run_suite("zadd/zscore/zrem/zrank — basic", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // zadd returns true for new member
         ASSERT_TRUE(c.zadd("z", 1.0, "a"));
@@ -433,6 +440,7 @@ static void test_sorted_set_basic() {
 
         // Multiple members — rank ordering by score ASC
         ChronoCache c2(g_test_config);
+        c2.init(false);
         c2.zadd("s", 1.0, "one");
         c2.zadd("s", 2.0, "two");
         c2.zadd("s", 3.0, "three");
@@ -454,6 +462,7 @@ static void test_sorted_set_basic() {
 static void test_sorted_set_ordering() {
     run_suite("zadd/zrank — ordering", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Identical scores — tiebreak by member name lexicographically
         c.zadd("lex", 5.0, "charlie");
@@ -467,6 +476,7 @@ static void test_sorted_set_ordering() {
 
         // Mixed scores and names
         ChronoCache c2(g_test_config);
+        c2.init(false);
         c2.zadd("m", 3.0, "aardvark");
         c2.zadd("m", 1.0, "zebra");
         c2.zadd("m", 2.0, "mango");
@@ -480,6 +490,7 @@ static void test_sorted_set_ordering() {
 
         // Negative scores
         ChronoCache c3(g_test_config);
+        c3.init(false);
         c3.zadd("neg", -10.0, "a");
         c3.zadd("neg", -5.0,  "b");
         c3.zadd("neg", 0.0,   "c");
@@ -491,6 +502,7 @@ static void test_sorted_set_ordering() {
 
         // Large score values
         ChronoCache c4(g_test_config);
+        c4.init(false);
         c4.zadd("big", 1e15,  "x");
         c4.zadd("big", -1e15, "y");
         ASSERT_EQ(*c4.zrank("big", "y"), 0);
@@ -498,6 +510,7 @@ static void test_sorted_set_ordering() {
 
         // Score update changes rank
         ChronoCache c5(g_test_config);
+        c5.init(false);
         c5.zadd("upd", 1.0, "low");
         c5.zadd("upd", 2.0, "mid");
         c5.zadd("upd", 3.0, "high");
@@ -515,6 +528,7 @@ static void test_sorted_set_ordering() {
 static void test_sorted_set_multiple_sets() {
     run_suite("zadd — multiple disjoint sets", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         c.zadd("setA", 1.0, "m1");
         c.zadd("setA", 2.0, "m2");
@@ -546,6 +560,7 @@ static void test_sorted_set_multiple_sets() {
 static void test_sorted_set_edge_cases() {
     run_suite("zadd — edge cases", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Empty string member
         ASSERT_TRUE(c.zadd("ez", 1.0, ""));
@@ -582,6 +597,7 @@ static void test_sorted_set_edge_cases() {
 static void test_ttl_interactions() {
     run_suite("TTL interactions", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // expire after persist: key should expire again
         c.set("x", "v");
@@ -626,6 +642,7 @@ static void test_ttl_interactions() {
 static void test_large_insert() {
     run_suite("large insert / resize stress", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int N = 10000;
 
         for (int i = 0; i < N; ++i) {
@@ -662,6 +679,7 @@ static void test_large_insert() {
 static void test_sorted_set_large() {
     run_suite("sorted-set large insert / rank correctness", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int N = 500;
 
         // Insert members with sequential scores
@@ -701,6 +719,7 @@ static void test_sorted_set_large() {
 static void test_concurrent_disjoint_keys() {
     run_suite("concurrent — disjoint key sets", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 8;
         const int OPS = 500;
         std::atomic<int> errors{0};
@@ -732,6 +751,7 @@ static void test_concurrent_disjoint_keys() {
 static void test_concurrent_same_key() {
     run_suite("concurrent — same key contention", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 16;
         const int OPS = 200;
         std::atomic<int> set_errors{0};
@@ -764,6 +784,7 @@ static void test_concurrent_same_key() {
 static void test_concurrent_set_get() {
     run_suite("concurrent — concurrent set+get, value integrity", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         c.set("shared", "init");
         const int WRITERS = 4;
         const int READERS = 4;
@@ -806,6 +827,7 @@ static void test_concurrent_set_get() {
 static void test_concurrent_del_get() {
     run_suite("concurrent — del+get race", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 8;
         const int OPS = 300;
         std::atomic<int> crashes{0};
@@ -849,6 +871,7 @@ static void test_concurrent_del_get() {
 static void test_concurrent_expire_get() {
     run_suite("concurrent — expire+get race", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int N = 200;
         const int THREADS = 6;
         std::atomic<int> crashes{0};
@@ -899,6 +922,7 @@ static void test_concurrent_expire_get() {
 static void test_concurrent_sorted_set() {
     run_suite("concurrent — zadd+zrem+zscore race", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 8;
         const int OPS = 200;
         std::atomic<int> crashes{0};
@@ -944,6 +968,7 @@ static void test_concurrent_sorted_set() {
 static void test_concurrent_resize_stress() {
     run_suite("concurrent — resize under load", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 8;
         const int KEYS_PER_THREAD = 2000; // 16 000 total — well past initial cap
         std::atomic<int> errors{0};
@@ -977,6 +1002,7 @@ static void test_concurrent_resize_stress() {
 static void test_concurrent_mixed_ops() {
     run_suite("concurrent — mixed KV + sorted-set", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 6;
         const int OPS = 300;
         std::atomic<int> crashes{0};
@@ -1023,6 +1049,7 @@ static void test_concurrent_mixed_ops() {
 static void test_ttl_concurrent_expiry() {
     run_suite("concurrent — TTL expiry under read pressure", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int N = 500;
         const int READERS = 8;
         std::atomic<int> crashes{0};
@@ -1064,6 +1091,7 @@ static void test_ttl_concurrent_expiry() {
 static void test_concurrent_set_del() {
     run_suite("concurrent — set+del on same key", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int ITERS = 1000;
         std::atomic<int> crashes{0};
 
@@ -1105,6 +1133,7 @@ static void test_concurrent_set_del() {
 static void test_pttl_monotone() {
     run_suite("pttl — monotone decrease", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         c.set("mono", "v", ms(2000));
         long long prev = c.pttl("mono");
         int inversions = 0;
@@ -1126,6 +1155,7 @@ static void test_pttl_monotone() {
 static void test_concurrent_expire_persist() {
     run_suite("concurrent — expire+persist race", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int ITERS = 500;
         std::atomic<int> crashes{0};
 
@@ -1167,6 +1197,7 @@ static void test_concurrent_expire_persist() {
 static void test_sorted_set_score_update_rank() {
     run_suite("sorted-set — score update preserves ranks", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         std::vector<std::string> members = {"a","b","c","d","e","f","g","h"};
         for (int i = 0; i < (int)members.size(); ++i)
@@ -1194,6 +1225,7 @@ static void test_sorted_set_score_update_rank() {
 static void test_sorted_set_single_element() {
     run_suite("sorted-set — single element", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         c.zadd("s1", 42.0, "only");
         ASSERT_EQ(*c.zrank("s1", "only"), 0);
         ASSERT_EQ(*c.zscore("s1", "only"), 42.0);
@@ -1210,6 +1242,7 @@ static void test_sorted_set_single_element() {
 static void test_stress_random_kv() {
     run_suite("stress — random mixed KV workload", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 10;
         const int OPS = 1000;
         std::atomic<int> crashes{0};
@@ -1251,6 +1284,7 @@ static void test_stress_random_kv() {
 static void test_stress_random_sorted_set() {
     run_suite("stress — random mixed sorted-set workload", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
         const int THREADS = 8;
         const int OPS = 1000;
         std::atomic<int> crashes{0};
@@ -1293,6 +1327,7 @@ static void test_stress_random_sorted_set() {
 static void test_idempotency() {
     run_suite("idempotency / double-op invariants", [] {
         ChronoCache c(g_test_config);
+        c.init(false);
 
         // Double set — second wins
         c.set("idem", "first");
@@ -1340,7 +1375,10 @@ static void test_idempotency() {
 
 static void test_independent_instances() {
     run_suite("independent instances", [] {
-        ChronoCache a(g_test_config), b(g_test_config);
+        ChronoCache a(g_test_config);
+        a.init(false);
+        ChronoCache b(g_test_config);
+        b.init(false);
 
         a.set("key", "from_a");
         b.set("key", "from_b");
