@@ -10,24 +10,18 @@ struct ChronCacheNode {
     T_value value;
 
     ChronCacheNode* next_in_bucket;
-    ChronCacheNode* prev_global;
-    ChronCacheNode* next_global;
 
     ChronCacheNode(const T_key& key, const T_value& value)
         : key(key)
         , hashed_key(ChronCacheHashKey<T_key>(key).get())
         , value(value)
-        , next_in_bucket(nullptr)
-        , prev_global(nullptr)
-        , next_global(nullptr) {}
+        , next_in_bucket(nullptr) {}
 
     explicit ChronCacheNode(const T_key& key)
         : key(key)
         , hashed_key(ChronCacheHashKey<T_key>(key).get())
         , value()
-        , next_in_bucket(nullptr)
-        , prev_global(nullptr)
-        , next_global(nullptr) {}
+        , next_in_bucket(nullptr) {}
 
     ~ChronCacheNode() = default;
 
@@ -45,8 +39,6 @@ struct ChronCacheNode {
 
     void clear_pointers() {
         next_in_bucket = nullptr;
-        prev_global = nullptr;
-        next_global = nullptr;
     }
 
     ChronCacheNode(const ChronCacheNode&) = delete;

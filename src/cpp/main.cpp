@@ -4,6 +4,10 @@
 #include <thread>
 
 #include "chrono_cache.h"
+#include "kafka_logging/event_logger.h"
+#include "kafka_logging/event_consumer.h"
+#include "cache_event.h"
+#include "cli.h"
 
 static void print_pttl(ChronoCache& cache, const std::string& key) {
     long long ms = cache.pttl(key);
@@ -12,10 +16,7 @@ static void print_pttl(ChronoCache& cache, const std::string& key) {
     else std::cout << "pttl(" << key << ") -> " << ms << " ms remaining\n";
 }
 
-int main() {
-    ChronoCache cache;
-
-    // --- Key-Value Store Operations ---
+void runKeyValueStoreOperations(ChronoCache& cache) {
     std::cout << "=== Key-Value Store ===" << std::endl;
 
     cache.set("name", "chrono-cache");
@@ -37,8 +38,9 @@ int main() {
 
     auto missing = cache.get("nonexistent");
     std::cout << "nonexistent key        -> " << missing.value_or("(nil)") << std::endl;
+}
 
-    // --- TTL Operations ---
+void runTtlOperations(ChronoCache& cache) {
     std::cout << "\n=== TTL (Time-To-Live) ===" << std::endl;
 
     // Basic TTL: key expires after 200 ms
@@ -91,8 +93,9 @@ int main() {
     print_pttl(cache, "overwrite_me");
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
     std::cout << "overwrite_me (after 250ms) -> " << cache.get("overwrite_me").value_or("(nil)") << "\n";
+}
 
-    // --- Sorted Set Operations ---
+void runSortedSetOperations(ChronoCache& cache) {
     std::cout << "\n=== Sorted Sets ===" << std::endl;
 
     cache.zadd("leaderboard", 1500.0, "alice");
@@ -119,6 +122,55 @@ int main() {
     std::cout << "\ncharlie score (after zrem) -> " << (charlie_score.has_value() ? std::to_string(charlie_score.value()) : "(nil)") << std::endl;
     std::cout << "bob     rank  (after zrem) -> " << cache.zrank("leaderboard", "bob").value() << std::endl;
     std::cout << "diana   rank  (after zrem) -> " << cache.zrank("leaderboard", "diana").value() << std::endl;
+}
+
+void runCacheEventsProducerOperations() {
+    CacheEventLogger cacheEventsLogger("localhost:9092", "chrono-events");
+    cacheEventsLogger.log_set("key1", "value1", 0);
+    cacheEventsLogger.log_set("key2", "value2", 0);
+    cacheEventsLogger.log_set("key3", "value3", 0);
+}
+
+void runCacheEventsConsumerOperations() {
+    CacheEventConsumer cacheEventsConsumer("localhost:9092", "chrono-events");
+    std::vector<CacheEvent> events = cacheEventsConsumer.consume_all_events();
+    for (const auto& event : events) {
+        std::cout << "Event: type=" << event_type_name(event.type)
+                  << " key=" << event.key
+                  << " value=" << event.value
+                  << " ttl_ms=" << event.ttl_ms
+                  << " seq=" << event.seq
+                  << " timestamp=" << event.timestamp
+                  << std::endl;
+    }
+}
+
+int main() {
+    CacheConfig config("localhost:9092", "chrono-events", false);
+
+    ChronoCacheCLI cli(config);
+    cli.run();
+    
+    // ChronoCache cache(config);
+
+    // try {
+    //     bool success = cache.replay();
+    //     if (!success) {
+    //         std::cerr << "Error: Failed to replay cache" << std::endl;
+    //         return 1;    
+    //     }
+    //     cache.make_ready_after_replay();
+    // } catch (const std::exception& e) {
+    //     std::cerr << "Error: " << e.what() << std::endl;
+    //     return 1;
+    // }
+
+    // runKeyValueStoreOperations(cache);
+    // runTtlOperations(cache);
+    // runSortedSetOperations(cache);
+
+    // runCacheEventsProducerOperations();
+    // runCacheEventsConsumerOperations();
 
     return 0;
 }

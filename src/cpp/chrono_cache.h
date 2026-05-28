@@ -8,15 +8,34 @@
 #include "cache_entry.h"
 #include "kv_store/hash_map.h"
 #include "sorted_sets/sorted_set.h"
+#include "kafka_logging/event_logger.h"
+#include "kafka_logging/event_consumer.h"
+#include "cache_config.h"
+#include "cache_state.h"
 
 static constexpr int CHRONO_CACHE_INITIAL_CAPACITY = 16;
 
 class ChronoCache {
-    ChronCacheHashMap<std::string, CacheEntry> kv_store;
+    ChronoCacheState state;
+
+    ChronCacheHashMap<std::string, CacheEntry> hash_map;
     SortedSetsAPI sorted_sets;
 
-public:
-    ChronoCache();
+    bool disable_event_logging;
+    std::optional<CacheEventLogger> cache_event_logger;
+    std::optional<CacheEventConsumer> cache_event_consumer;
+
+    bool is_logging_allowed() const;
+    void check_accepting_ops();
+    void replay();
+
+    public:
+
+    ChronoCache(const CacheConfig& config);
+
+    bool is_accepting_ops() const;
+
+    bool init(bool with_replay);
 
     bool set(const std::string& key, const std::string& value,
              std::optional<std::chrono::milliseconds> ttl = std::nullopt);

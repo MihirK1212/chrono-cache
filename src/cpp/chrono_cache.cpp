@@ -1,58 +1,104 @@
+#include <stdexcept>
+#include <unordered_map>
+
 #include "chrono_cache.h"
 
-ChronoCache::ChronoCache()
-    : kv_store(CHRONO_CACHE_INITIAL_CAPACITY)
-    , sorted_sets() {}
 
-bool ChronoCache::set(const std::string& key, const std::string& value,
-                      std::optional<std::chrono::milliseconds> ttl) {
+ChronoCache::ChronoCache(const CacheConfig& config)
+    : state(ChronoCacheState::UNINITIALIZED)
+    , hash_map(CHRONO_CACHE_INITIAL_CAPACITY)
+    , sorted_sets()
+    , disable_event_logging(config.disable_event_logging) 
+    , cache_event_logger(config.disable_event_logging
+        ? std::nullopt
+        : std::make_optional<CacheEventLogger>(config.kafka_brokers, config.kafka_cache_events_topic))
+    , cache_event_consumer(config.disable_event_logging
+        ? std::nullopt
+        : std::make_optional<CacheEventConsumer>(config.kafka_brokers, config.kafka_cache_events_topic)) {}
+
+bool ChronoCache::is_logging_allowed() const {
+    return !disable_event_logging && cache_event_logger && state == ChronoCacheState::READY;
+}
+
+bool ChronoCache::is_accepting_ops() const {
+    return state == ChronoCacheState::READY || state == ChronoCacheState::REPLAYING;
+}
+
+void ChronoCache::check_accepting_ops() {
+    if(!is_accepting_ops()) {
+        throw std::runtime_error("ChronoCache is not ready to accept operations");
+    }
+}
+
+bool ChronoCache::set(const std::string& key, const std::string& value, std::optional<std::chrono::milliseconds> ttl) 
+{
+    check_accepting_ops();
+
     CacheEntry entry = ttl.has_value()
         ? CacheEntry(value, *ttl)
         : CacheEntry(value);
-    return kv_store.set(key, entry);
+
+    return hash_map.set(key, entry, [&]() {
+        if (is_logging_allowed()) {
+            cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : -1);
+        }
+    });
 }
 
-// get, expire, pttl, and persist all follow the same pattern:
-// acquire the write lock, then operate via _unguarded methods under that lock.
-//
-// Why not use the public map API (get, remove) directly?
-// get_ptr_unguarded returns a raw pointer into the map's internal node. That pointer
-// is only valid while the stripe lock is held — a concurrent remove() on the same key
-// would delete the node and leave the pointer dangling before we even read is_expired().
-// Releasing the lock between the get and the remove is not safe, even with null checks:
-// a freed pointer is still non-null; dereferencing it is UB.
-//
-// The lock must be held for the entire sequence: get pointer → inspect → conditionally remove.
-std::optional<std::string> ChronoCache::get(const std::string& key) {
+std::optional<std::string> ChronoCache::get(const std::string& key) 
+{
+    check_accepting_ops();
+
     std::optional<std::string> result;
-    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        result = e->value;
+        result = e->get_value();
         return false;
     });
     return result;
 }
 
-bool ChronoCache::del(const std::string& key) {
-    return kv_store.remove(key);
+bool ChronoCache::del(const std::string& key) 
+{
+    check_accepting_ops();
+
+    return hash_map.remove(key, [&]() {
+        if (is_logging_allowed()) {
+            cache_event_logger->log_del(key);
+        }
+    });
 }
 
 bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) {
-    bool found = false;
-    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+    check_accepting_ops();
+
+    if(ttl.count() <= 0) {
+        throw std::invalid_argument("TTL must be greater than 0");
+    }
+
+    bool updated_ttl = false;
+    std::string current_value;
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        e->expires_at = CacheEntry::Clock::now() + ttl;
-        found = true;
+        e->update_ttl(ttl);
+        current_value = e->get_value();
+        updated_ttl = true;
+        if (is_logging_allowed()) {
+            cache_event_logger->log_expire(key, current_value, ttl.count());
+        }
         return false;
     });
-    return found;
+
+    return updated_ttl;
 }
 
 long long ChronoCache::pttl(const std::string& key) {
+    check_accepting_ops();
+
     long long result = -2;
-    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         result = e->has_ttl() ? e->remaining_ttl()->count() : -1;
@@ -62,29 +108,140 @@ long long ChronoCache::pttl(const std::string& key) {
 }
 
 bool ChronoCache::persist(const std::string& key) {
-    bool found = false;
-    kv_store.check_and_remove(key, [&](CacheEntry* e) {
+    check_accepting_ops();
+
+    bool ttl_removed = false;
+    std::string current_value;
+    hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        e->expires_at = std::nullopt;
-        found = true;
+        if (e->has_ttl()) {
+            e->remove_ttl();
+            current_value = e->get_value();
+            ttl_removed = true;
+            if (is_logging_allowed()) {
+                cache_event_logger->log_persist(key, current_value);
+            }
+        }
         return false;
     });
-    return found;
+
+    return ttl_removed;
 }
 
 bool ChronoCache::zadd(const std::string& key, double score, const std::string& member) {
+    check_accepting_ops();
+
     return sorted_sets.zadd(key, score, member);
 }
 
 std::optional<double> ChronoCache::zscore(const std::string& key, const std::string& member) const {
+    (const_cast<ChronoCache*>(this))->check_accepting_ops();
+
     return sorted_sets.zscore(key, member);
 }
 
 bool ChronoCache::zrem(const std::string& key, const std::string& member) {
+    check_accepting_ops();
+
     return sorted_sets.zrem(key, member);
 }
 
 std::optional<int> ChronoCache::zrank(const std::string& key, const std::string& member) const {
+    (const_cast<ChronoCache*>(this))->check_accepting_ops();
+
     return sorted_sets.zrank(key, member);
+}
+
+
+void ChronoCache::replay() {
+    std::vector<CacheEvent> events = cache_event_consumer->consume_all_events();
+
+    std::unordered_map<std::string, uint64_t> last_applied_seq;
+
+    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+
+    for (CacheEvent& event : events) {
+        const std::string& key   = event.key;
+        const std::string& value = event.value;
+        int64_t  ttl_ms = event.ttl_ms;
+        uint64_t seq    = event.seq;
+
+        if (last_applied_seq[key] >= seq) {
+            continue;
+        }
+        last_applied_seq[key] = seq;
+
+        switch (event.type) {
+            case EventType::SET: {
+                if (ttl_ms > 0) {
+                    int64_t expires_at_ms = event.timestamp + ttl_ms;
+                    if (expires_at_ms <= now_ms) break; // expired during downtime 
+                    int64_t remaining_ms = expires_at_ms - now_ms;
+                    this->set(key, value, std::chrono::milliseconds(remaining_ms));
+                } else {
+                    this->set(key, value, std::nullopt);
+                }
+                break;
+            }
+
+            case EventType::DELETE: {
+                this->del(key);
+                break;
+            }
+
+            case EventType::EXPIRE: {
+                int64_t expires_at_ms = event.timestamp + ttl_ms;
+                if (expires_at_ms <= now_ms) break; // expired during downtime 
+                int64_t remaining_ms = expires_at_ms - now_ms;
+                this->set(key, value, std::chrono::milliseconds(remaining_ms));
+                break;
+            }
+
+            case EventType::PERSIST: {
+                this->set(key, value, std::nullopt);
+                break;
+            }
+
+            default: {
+                throw std::logic_error("Unknown event type");
+            }
+        }
+    }
+
+    cache_event_logger->set_seq_counters(last_applied_seq);
+}
+
+bool ChronoCache::init(bool with_replay) {
+    if (state != ChronoCacheState::UNINITIALIZED) {
+        throw std::runtime_error("ChronoCache::init() requires UNINITIALIZED state");
+    }
+
+    if (!with_replay) {
+        state = ChronoCacheState::READY;
+        return true;
+    }
+
+    if (disable_event_logging) {
+        throw std::runtime_error("Cannot replay: event logging is disabled in config");
+    }
+
+    state = ChronoCacheState::REPLAYING;
+    try {
+        replay();
+        state = ChronoCacheState::REPLAY_SUCCESS;
+    } catch (const std::exception&) {
+        state = ChronoCacheState::REPLAY_FAILED;
+        throw;
+    }
+
+    if(state == ChronoCacheState::REPLAY_SUCCESS) {
+        state = ChronoCacheState::READY;
+        return true;
+    } else {
+        throw std::runtime_error("Replay failed");
+        return false;
+    }
 }
