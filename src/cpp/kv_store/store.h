@@ -46,7 +46,7 @@ private:
     KVStore(KVStore&&) = delete;
     KVStore& operator=(KVStore&&) = delete;
 
-    // Public unguarded API (callers are responsible for synchronization)
+    // public unguarded methods without any locking (not thread safe)
     bool set(const T_key& key, const T_value& value);
     T_value* get_ptr(const T_key& key);
     const T_value* get_ptr(const T_key& key) const;
@@ -196,9 +196,7 @@ bool KVStore<T_key, T_value>::set(const T_key& key, const T_value& value) {
         return true;
     }
     Node* new_node = new Node(key, value);
-    {
-        insert_into_bucket(bucket_index, new_node);
-    }
+    insert_into_bucket(bucket_index, new_node);
     return true;
 }
 
@@ -238,9 +236,7 @@ T_value* KVStore<T_key, T_value>::get_or_add(const T_key& key) {
     if (existing != nullptr) return &existing->value;
 
     Node* new_node = new Node(key);
-    {
-        insert_into_bucket(bucket_index, new_node);
-    }
+    insert_into_bucket(bucket_index, new_node);
     return &new_node->value;
 }
 

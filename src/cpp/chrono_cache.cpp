@@ -77,21 +77,21 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
         throw std::invalid_argument("TTL must be greater than 0");
     }
 
-    bool found = false;
+    bool updated_ttl = false;
     std::string current_value;
     hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
         e->update_ttl(ttl);
         current_value = e->get_value();
-        found = true;
+        updated_ttl = true;
         if (is_logging_allowed()) {
             cache_event_logger->log_expire(key, current_value, ttl.count());
         }
         return false;
     });
 
-    return found;
+    return updated_ttl;
 }
 
 long long ChronoCache::pttl(const std::string& key) {
@@ -110,15 +110,15 @@ long long ChronoCache::pttl(const std::string& key) {
 bool ChronoCache::persist(const std::string& key) {
     check_accepting_ops();
 
-    bool found = false;
+    bool ttl_removed = false;
     std::string current_value;
     hash_map.process_and_remove_if(key, [&](CacheEntry* e) {
         if (!e) return false;
         if (e->is_expired()) return true;
-        found = true; 
         if (e->has_ttl()) {
             e->remove_ttl();
             current_value = e->get_value();
+            ttl_removed = true;
             if (is_logging_allowed()) {
                 cache_event_logger->log_persist(key, current_value);
             }
@@ -126,7 +126,7 @@ bool ChronoCache::persist(const std::string& key) {
         return false;
     });
 
-    return found;
+    return ttl_removed;
 }
 
 bool ChronoCache::zadd(const std::string& key, double score, const std::string& member) {
@@ -231,10 +231,17 @@ bool ChronoCache::init(bool with_replay) {
     state = ChronoCacheState::REPLAYING;
     try {
         replay();
-        state = ChronoCacheState::READY;
-        return true;
+        state = ChronoCacheState::REPLAY_SUCCESS;
     } catch (const std::exception&) {
         state = ChronoCacheState::REPLAY_FAILED;
         throw;
+    }
+
+    if(state == ChronoCacheState::REPLAY_SUCCESS) {
+        state = ChronoCacheState::READY;
+        return true;
+    } else {
+        throw std::runtime_error("Replay failed");
+        return false;
     }
 }

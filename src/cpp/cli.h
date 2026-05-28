@@ -91,7 +91,7 @@ class ChronoCacheCLI {
             "    RESET                          destroy current state; requires INIT to continue\n"
             "\n"
             "  Utility:\n"
-            "    PING                           check the cache is alive\n"
+            "    PING                           returns PONG if cache is ready\n"
             "    INFO                           show configuration and status\n"
             "    HELP                           show this help message\n"
             "    QUIT / EXIT                    exit the CLI\n"
@@ -218,20 +218,26 @@ class ChronoCacheCLI {
     }
 
     void cmd_info() const {
+        const char* status =
+            !cache                      ? "uninitialized" :
+            cache->is_accepting_ops()   ? "ready"         :
+                                          "not ready";
         std::cout << "# chrono-cache\n"
-                  << "kafka_brokers: " << config.kafka_brokers            << "\n"
-                  << "kafka_topic:   " << config.kafka_cache_events_topic << "\n"
-                  << "event_logging: " << (config.disable_event_logging ? "disabled" : "enabled") << "\n";
+                  << "status:        " << status                                                    << "\n"
+                  << "kafka_brokers: " << config.kafka_brokers                                      << "\n"
+                  << "kafka_topic:   " << config.kafka_cache_events_topic                           << "\n"
+                  << "event_logging: " << (config.disable_event_logging ? "disabled" : "enabled")  << "\n";
     }
 
-
-    // Returns false when the user requests to quit.
     bool dispatch(const std::vector<std::string>& args) {
         const std::string cmd = to_upper(args[0]);
 
-        // Commands that are always available regardless of cache state.
         if (cmd == "QUIT" || cmd == "EXIT") { std::cout << "Bye!\n"; return false; }
-        if (cmd == "PING")  { std::cout << "PONG\n"; return true; }
+        if (cmd == "PING") {
+            if (is_ready()) std::cout << "PONG\n";
+            else            std::cout << "(error) Cache not ready — run INIT first\n";
+            return true;
+        }
         if (cmd == "HELP")  { print_help();           return true; }
         if (cmd == "INFO")  { cmd_info();             return true; }
 
@@ -267,7 +273,6 @@ class ChronoCacheCLI {
             return true;
         }
 
-        // Commands below require the cache to be ready.
         if (!is_ready()) {
             std::cout << "(error) Cache is not initialised. Run INIT or INIT true first.\n";
             return true;

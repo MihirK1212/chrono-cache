@@ -68,15 +68,16 @@ public:
 
     template<typename PostFn>
     bool set(const T_key& key, const T_value& value, PostFn&& post_fn) {
+        bool set_success;
         bool resize_needed;
         {
             auto lock = acquire_write_lock(key);
-            kv_store.set(key, value);
+            set_success = kv_store.set(key, value);
             std::forward<PostFn>(post_fn)();
             resize_needed = kv_store.needs_resize();
         }
         if (resize_needed) maybe_resize();
-        return true;
+        return set_success;
     }
 
     T_value* get_ptr(const T_key& key) {

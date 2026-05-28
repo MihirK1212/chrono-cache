@@ -322,10 +322,10 @@ static void test_persist() {
         sleep_ms(150);
         ASSERT_TRUE(c.get("p1").has_value());
 
-        // persist on a key with no TTL is a no-op but still returns true
+        // persist on a key with no TTL is a no-op and returns false
         // (the key exists and is not expired — implementation sets expires_at = nullopt)
         c.set("p2", "val");
-        ASSERT_TRUE(c.persist("p2"));
+        ASSERT_FALSE(c.persist("p2"));
         ASSERT_EQ(c.pttl("p2"), -1LL);
 
         // persist on non-existent key returns false
@@ -1346,10 +1346,10 @@ static void test_idempotency() {
         sleep_ms(100);
         ASSERT_FALSE(c.get("de").has_value());
 
-        // Double persist — both succeed on a key with TTL; second is on no-TTL key
+        // Double persist — both succeed on a key with TTL; second is on no-TTL key (returns false)
         c.set("dp", "v", ms(5000));
         ASSERT_TRUE(c.persist("dp"));
-        ASSERT_TRUE(c.persist("dp")); // already no TTL — still returns true (key exists)
+        ASSERT_FALSE(c.persist("dp")); // if already no TTL, returns false
 
         // persist on non-existent
         ASSERT_FALSE(c.persist("ghost_idem"));
