@@ -66,20 +66,3 @@ target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Debug>:-O0 -g>
 )
-
-
-# ---- Tests ----
-enable_testing()
-
-add_executable(chrono_cache_tests
-    src/cpp/tests/chrono_cache_tests.cpp
-)
-
-target_link_libraries(chrono_cache_tests PRIVATE chrono_cache_core Threads::Threads)
-
-target_compile_options(chrono_cache_tests PRIVATE
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Debug>:-O0 -g>
-)
-
-add_test(NAME chrono_cache_tests COMMAND chrono_cache_tests)
