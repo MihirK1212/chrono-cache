@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 
 #include <nlohmann/json.hpp>
 
@@ -82,12 +83,15 @@ std::vector<CacheEvent> CacheEventsKafkaConsumer::consume_all_events() {
     std::cout << "All " << num_partitions << " partitions assigned, starting to consume events" << std::endl;
 
     int count_reached_eof = 0;
+    int consecutive_timeouts = 0;
+    const int MAX_CONSECUTIVE_TIMEOUTS = 3;
 
     while (count_reached_eof < num_partitions) {
         RdKafka::Message* msg = consumer->consume(5000);
 
         switch (msg->err()) {
             case RdKafka::ERR_NO_ERROR: {
+                consecutive_timeouts = 0;
                 std::string json_str(static_cast<const char*>(msg->payload()), msg->len());
                 try {
                     nlohmann::json j = nlohmann::json::parse(json_str);
@@ -119,12 +123,18 @@ std::vector<CacheEvent> CacheEventsKafkaConsumer::consume_all_events() {
             }
 
             case RdKafka::ERR__PARTITION_EOF:
+                consecutive_timeouts = 0;
                 count_reached_eof++;
                 std::cout << "Reached end of partition " << count_reached_eof << std::endl;
                 break;
 
             case RdKafka::ERR__TIMED_OUT:
-                std::cout << "Timeout while consuming events" << std::endl;
+                consecutive_timeouts++;
+                if (consecutive_timeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+                    delete msg;
+                    throw std::runtime_error("Kafka broker unreachable: timed out after " +
+                        std::to_string(MAX_CONSECUTIVE_TIMEOUTS) + " consecutive timeouts");
+                }
                 break;
 
             default:

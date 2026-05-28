@@ -9,7 +9,6 @@
 #include "kv_store/hash_map.h"
 #include "sorted_sets/sorted_set.h"
 #include "kafka_logging/event_logger.h"
-#include "kafka_logging/event_consumer.h"
 #include "cache_config.h"
 #include "cache_state.h"
 
@@ -22,10 +21,12 @@ class ChronoCache {
     SortedSetsAPI sorted_sets;
 
     bool disable_event_logging;
+    std::string kafka_brokers;
+    std::string kafka_topic;
     std::optional<CacheEventLogger> cache_event_logger;
-    std::optional<CacheEventConsumer> cache_event_consumer;
 
     bool is_logging_allowed() const;
+    CacheEventLogger& ensure_logger();
     void check_accepting_ops();
     void replay();
 
