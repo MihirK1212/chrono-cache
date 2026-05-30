@@ -25,8 +25,7 @@ class ChronoCache {
     std::string kafka_topic;
     std::optional<CacheEventLogger> cache_event_logger;
 
-    bool is_logging_allowed() const;
-    CacheEventLogger& ensure_logger();
+    bool check_logging_allowed() const;
     void check_accepting_ops();
     void replay();
 

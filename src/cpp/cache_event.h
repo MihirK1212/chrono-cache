@@ -32,6 +32,6 @@ struct CacheEvent {
     int64_t     ttl_ms    = 0;
     uint64_t    seq       = 0;
     int64_t     timestamp = 0;
-};
+}; 
 
 #endif
