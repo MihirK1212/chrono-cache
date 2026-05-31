@@ -36,6 +36,10 @@ add_library(chrono_cache_core
     src/cpp/kafka_logging/consumer.cpp
     src/cpp/kafka_logging/event_logger.cpp
     src/cpp/kafka_logging/event_consumer.cpp
+    src/cpp/server/server.cpp
+    src/cpp/server/worker.cpp
+    src/cpp/server/event_loop.cpp
+    src/cpp/server/socket_utils.cpp
 )
 
 target_include_directories(chrono_cache_core PUBLIC src/cpp)
