@@ -30,9 +30,15 @@ static void do_something(int connfd) {
 }
 
 void EventLoop::run() {
-    while(true) {
+    running = true;
+    while (running) {
         sockaddr_in client_addr;
         int connfd = accept_connection(server_fd, client_addr);
+        if (connfd < 0) {
+            break;
+        }
+
+        std::cout << "accepted connection on server_fd " << server_fd << "\n";
 
         do_something(connfd);
         close(connfd);
@@ -40,6 +46,8 @@ void EventLoop::run() {
 }
 
 void EventLoop::stop() {
-    server_fd = -1;
-    return;
+    running = false;
+    if (server_fd >= 0) {
+        shutdown(server_fd, SHUT_RDWR);
+    }
 }

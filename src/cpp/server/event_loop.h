@@ -1,6 +1,7 @@
 #ifndef CC_EVENT_LOOP_H
 #define CC_EVENT_LOOP_H
 
+#include <atomic>
 #include "../chrono_cache.h"
 
 class EventLoop {
@@ -15,6 +16,7 @@ class EventLoop {
 
     int server_fd;
     ChronoCache& cache;
+    std::atomic<bool> running{false};
 };
 
 #endif

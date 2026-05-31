@@ -9,11 +9,11 @@ class ChronoCacheServer {
     public:
 
     struct ChronoCacheServerConfig {
-        int port = 2811;
-        int num_workers = 0; // auto (hardware concurrency limit)
+        int port;
+        int num_workers; // auto (hardware concurrency limit)
     };
 
-    ChronoCacheServer(ChronoCache& cache);
+    ChronoCacheServer(const ChronoCacheServerConfig config, ChronoCache& cache);
 
     void start();
     void stop();
@@ -24,6 +24,8 @@ class ChronoCacheServer {
     ChronoCacheServerConfig config;
     ChronoCache& cache;
     std::vector<std::unique_ptr<Worker>> workers;
+
+    void setup_signal_handlers();
 };
 
 #endif

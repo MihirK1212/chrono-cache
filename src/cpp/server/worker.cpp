@@ -12,9 +12,14 @@
 
 Worker::Worker(int id, int port, ChronoCache&cache): id(id), port(port), cache(cache) {};
 
+Worker::~Worker() {
+    if (thread.joinable()) {
+        thread.join();
+    }
+}
 
 void Worker::start() {
-    run();
+    thread = std::thread(&Worker::run, this);
 }
 
 void Worker::stop() {
@@ -24,14 +29,18 @@ void Worker::stop() {
 }
 
 void Worker::join() {
-    return;
+    thread.join();
 }
 
 void Worker::run() {
-    int fd = create_socket_and_bind(port);    
+    try {
+        int fd = create_socket_and_bind(port);
 
-    event_loop = std::make_unique<EventLoop>(fd, cache);
-    event_loop->run();
+        event_loop = std::make_unique<EventLoop>(fd, cache);
+        event_loop->run();
 
-    close(fd);
+        close(fd);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "Worker %d fatal error: %s\n", id, e.what());
+    }
 }
