@@ -7,6 +7,13 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+int create_socket_and_bind(uint16_t port);
+
+void set_nonblocking(int fd);
+
+/*
+Private helpers
+*/
 
 int get_new_socket_id();
 
@@ -15,9 +22,5 @@ void set_socket_options(int fd);
 sockaddr_in get_socket_addr(uint16_t port);
 
 void bind_socket_to_addr(int fd, const sockaddr_in& addr);
-
-int create_socket_and_bind(uint16_t port);
-
-int accept_connection(int server_fd, sockaddr_in& client_addr);
 
 #endif

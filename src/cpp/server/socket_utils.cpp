@@ -1,4 +1,5 @@
 #include "socket_utils.h"
+
 #include <asm-generic/socket.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -11,6 +12,21 @@
 #include <system_error>
 #include <cstring>
 #include <netinet/tcp.h> 
+#include <fcntl.h>
+
+
+int create_socket_and_bind(uint16_t port)
+{
+    int fd = get_new_socket_id();
+    set_socket_options(fd);
+    set_nonblocking(fd);
+
+    sockaddr_in server_addr = get_socket_addr(port);
+
+    bind_socket_to_addr(fd, server_addr);
+
+    return fd;
+}
 
 int get_new_socket_id() 
 {
@@ -37,6 +53,13 @@ void set_socket_options(int fd)
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
     setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val));  // uses same port
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));  // disable nagle
+}
+
+void set_nonblocking(int fd)
+{
+    int flags = fcntl(fd, F_GETFL, 0);  // get the flags
+    flags |= O_NONBLOCK;                // modify the flags
+    fcntl(fd, F_SETFL, flags); 
 }
 
 sockaddr_in get_socket_addr(uint16_t port)
@@ -71,24 +94,3 @@ void bind_socket_to_addr(int fd, const sockaddr_in& addr)
         throw std::system_error(errno, std::generic_category(), "listen");
     }
 }
-
-int create_socket_and_bind(uint16_t port)
-{
-    int fd = get_new_socket_id();
-    set_socket_options(fd);
-
-    sockaddr_in server_addr = get_socket_addr(port);
-
-    bind_socket_to_addr(fd, server_addr);
-
-    return fd;
-}
-
-int accept_connection(int server_fd, sockaddr_in& client_addr)
-{
-    std::memset((char *)&client_addr, 0, sizeof(client_addr)); 
-    socklen_t addrlen = sizeof(client_addr);
-
-    // accept requires the generic sockaddr interface instead of sockaddr_in
-    return accept(server_fd, (sockaddr *)&client_addr, &addrlen); 
-}   

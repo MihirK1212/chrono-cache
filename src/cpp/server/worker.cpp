@@ -29,7 +29,9 @@ void Worker::stop() {
 }
 
 void Worker::join() {
-    thread.join();
+    if (thread.joinable()) {
+        thread.join();
+    }
 }
 
 void Worker::run() {

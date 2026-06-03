@@ -1,13 +1,17 @@
+#include <cassert>
+#include <cerrno>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <poll.h>
 
-#include "socket_utils.h"
+#include "connection.h"
 #include "event_loop.h"
 #include "chrono_cache.h"
 
@@ -16,32 +20,100 @@ EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), c
 
 EventLoop::~EventLoop() {}
 
-static void do_something(int connfd) {
-    char rbuf[64] = {};
-    ssize_t n = read(connfd, rbuf, sizeof(rbuf) - 1);
-    if (n < 0) {
-        fprintf(stderr, "%s\n", "read() error");
-        return;
-    }
-    fprintf(stderr, "client says: %s\n", rbuf);
+void EventLoop::run() 
+{
+    /*
+        1. fd2conn maintains map from each client connection fd to the Connection object 
+        2. using fd2conn and server_fd, create poll_args list -> poll_args[0] = server_pfds, other poll_args[i] = client_pfds
+        3. each pfd contains -> {fd, event, revent}
+        4. call poll() using the poll_args
+        5. use the poll_args[i].revents from each poll_arg after calling poll to handle accordingly
+    */
 
-    char wbuf[] = "world";
-    write(connfd, wbuf, strlen(wbuf));
-}
+    // map of all client connections, keyed by fd
+    std::vector<Connection*> fd2conn;
 
-void EventLoop::run() {
+    // pollfd is the communication template with the poll() call
+    // it stores fd, events (request) and revents (response)
+    std::vector<struct pollfd> poll_args;
+
     running = true;
     while (running) {
-        sockaddr_in client_addr;
-        int connfd = accept_connection(server_fd, client_addr);
-        if (connfd < 0) {
-            break;
+        poll_args.clear();
+
+        // add server poll fd to poll args list
+        // accept() is treated as read() in readiness notifications, so it uses POLLIN
+        struct pollfd server_pfd = {server_fd, POLLIN, 0};
+        poll_args.push_back(server_pfd);
+
+        // add all client connections to poll args list
+        for(Connection* conn: fd2conn) {
+            if(!conn) {continue;}
+
+            struct pollfd client_pfd = {conn->fd, 0, 0};
+
+            if(conn->want_read) {
+                client_pfd.events |= POLLIN;
+            }
+            if(conn->want_write) {
+                client_pfd.events |= POLLOUT;
+            }
+
+            poll_args.push_back(client_pfd);
+        }
+        
+        int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), 1000);
+        if(rv < 0 && errno == EINTR) {
+            continue; // not an error
+        }
+        if(rv < 0) {
+            throw std::system_error(errno, std::generic_category(), "poll");
         }
 
-        std::cout << "accepted connection on server_fd " << server_fd << "\n";
+        // handle the server socket for new connections
+        if(poll_args[0].revents & POLLIN) {
+            if(Connection* conn = Connection::handle_accept(server_fd)) {
+                if(fd2conn.size() <= (size_t)conn->fd) {
+                    fd2conn.resize(conn->fd + 1);
+                }
+                fd2conn[conn->fd] = conn;
+            }
+        }
 
-        do_something(connfd);
-        close(connfd);
+        // handle client connection sockets 
+        for(size_t i=1; i < poll_args.size(); i++) {
+            uint32_t ready = poll_args[i].revents;
+            if(ready == 0) {
+                continue;
+            }
+
+            Connection* conn = fd2conn[poll_args[i].fd];
+
+            if(ready & POLLIN) {
+                assert(conn->want_read);
+                conn->handle_read();
+            }
+
+            if(!conn->want_close && (ready & POLLOUT)) {
+                assert(conn->want_write);
+                conn->handle_write();
+            }
+
+
+            if ((ready & POLLERR) || (ready & POLLHUP) || conn->want_close) {
+                close(conn->fd);
+                fd2conn[conn->fd] = NULL;
+                delete conn;
+            }
+        }
+    }
+
+    // cleanup remaining connections on shutdown
+    for (Connection* conn : fd2conn) {
+        if (conn) {
+            close(conn->fd);
+            delete conn;
+        }
     }
 }
 
