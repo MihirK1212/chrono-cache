@@ -91,7 +91,28 @@ void EventLoop::run()
 
             if(ready & POLLIN) {
                 assert(conn->want_read);
-                conn->handle_read();
+                std::vector<ReadResponse> responses = conn->handle_read();
+                for(const ReadResponse& response: responses) {
+                    if(!response.success) {
+                        continue;
+                    }
+                    if(!response.data.has_value()) {
+                        continue;
+                    }
+                    const std::vector<uint8_t>& response_data = response.data.value();
+                    printf("client response:");
+                    int len = (int)response_data.size();
+                    printf("client says: len:%d data:%.*s\n",
+                    len, len < 100 ? len : 100, response_data.data());
+
+                    printf("byte by byte: ");
+                    for(int j=0; j<len; j++) {
+                        printf("%d ", (int)response_data[j]);
+                    }
+                    
+                    printf("\n\n");
+                }
+                
             }
 
             if(!conn->want_close && (ready & POLLOUT)) {

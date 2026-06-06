@@ -22,10 +22,16 @@
 #include <netinet/ip.h>
 #include <sys/poll.h>
 #include <unistd.h>
+#include <optional>
 
 #include "server/socket_utils.h"
 
 const size_t k_max_msg = 32 << 20; 
+
+struct ReadResponse {
+    bool success;
+    std::optional<std::vector<uint8_t>> data;
+};
 
 struct Connection {
     int fd = -1;
@@ -37,32 +43,49 @@ struct Connection {
     std::vector<uint8_t> incoming;
     std::vector<uint8_t> outgoing;
 
-    void handle_read() {
+    
+    std::vector<ReadResponse> handle_read() {
+        /*
+            Keep filling data into the 'incoming' buffer 
+            after every fill, do try_one_request() to see if we have valid request data
+            inside each try_one_request, porcess one valid request and then remove its data from the incoming buffer
+        */
         uint8_t buf[64*1024];
         ssize_t rv = read(fd, buf, sizeof(buf));
         if (rv < 0 && errno == EAGAIN) {
-            return;
+            return {};
         }
         if (rv == 0) {
             want_close = true;
-            return;
+            return {};
         }
         if (rv < 0) {
             want_close = true;
-            return;
+            return {};
         }
         
         size_t len = (size_t)rv;
         buf_append(incoming, buf, len);
 
+        std::vector<ReadResponse> responses;
+
         // check if the current data in incoming is enough for a valid request
         // use a while loop to handle multiple requests in a single read
-        while(try_one_request()) {};
+        while(true) {
+            ReadResponse response = try_one_request();
+            if(!response.success || !response.data.has_value()) {
+                break;
+            }
+            generate_echo_response(response.data.value());
+            responses.push_back(response);
+        }
 
         if(outgoing.size() > 0) {
             want_read = false;
             want_write = true;
         }
+
+        return responses;
     }
 
     void handle_write() {
@@ -84,7 +107,7 @@ struct Connection {
         }
     }
 
-    bool try_one_request() {
+    ReadResponse try_one_request() {
         /*
             for now, assume message is of the following format:
             4 bytes -> len of message
@@ -96,7 +119,7 @@ struct Connection {
         */
 
         if(incoming.size() < 4) {
-            return false; 
+            return ReadResponse{false, std::nullopt}; 
         }
 
         uint32_t len_network = 0;
@@ -105,28 +128,30 @@ struct Connection {
 
         if(len > k_max_msg) {
             want_close = true;
-            return false;
+            return ReadResponse{false, std::nullopt};
         }
 
         if(incoming.size() < (4 + len)) {
-            return false;  
+            return ReadResponse{false, std::nullopt};  
         }
-        const uint8_t *request = &incoming[4];
-
-        printf("client says: len:%d data:%.*s\n",
-        len, len < 100 ? len : 100, request);
-
-        // generate the response (echo)
-        uint32_t len_network_response = htonl(len);
-        buf_append(outgoing, (const uint8_t *)&len_network_response, 4);
-        buf_append(outgoing, request, len);
+        const uint8_t *read_data = &incoming[4];
         
+        // store the response in a vector
+        std::vector<uint8_t> data(len);
+        memcpy(data.data(), read_data, len);
+
         // remove the message from incoming
         buf_consume(incoming, 4 + len);
 
-        return true;  
+        return ReadResponse{true, data};  
     }
 
+    void generate_echo_response(const std::vector<uint8_t> &read_data) {
+        // generate the response (echo)
+        uint32_t len_network_response = htonl(read_data.size());
+        buf_append(outgoing, (const uint8_t *)&len_network_response, 4);
+        buf_append(outgoing, read_data.data(), read_data.size());
+    }
 
     static Connection* handle_accept(int server_fd) {
         sockaddr_in client_addr = {};
