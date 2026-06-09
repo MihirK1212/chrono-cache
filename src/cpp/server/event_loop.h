@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include "../chrono_cache.h"
+#include "request_handler/command_handler.h"
+#include "request_handler/resp_parser.h"
 
 class EventLoop {
     public:
@@ -17,6 +19,7 @@ class EventLoop {
     int server_fd;
     ChronoCache& cache;
     std::atomic<bool> running{false};
+    CommandHandler command_handler;
 };
 
 #endif

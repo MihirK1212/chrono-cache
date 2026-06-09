@@ -69,20 +69,13 @@ struct Connection {
 
         std::vector<ReadResponse> responses;
 
-        // check if the current data in incoming is enough for a valid request
-        // use a while loop to handle multiple requests in a single read
+        // use a while loop to drain all complete requests buffered from this read
         while(true) {
             ReadResponse response = try_one_request();
             if(!response.success || !response.data.has_value()) {
                 break;
             }
-            generate_echo_response(response.data.value());
             responses.push_back(response);
-        }
-
-        if(outgoing.size() > 0) {
-            want_read = false;
-            want_write = true;
         }
 
         return responses;
@@ -146,11 +139,10 @@ struct Connection {
         return ReadResponse{true, data};  
     }
 
-    void generate_echo_response(const std::vector<uint8_t> &read_data) {
-        // generate the response (echo)
-        uint32_t len_network_response = htonl(read_data.size());
-        buf_append(outgoing, (const uint8_t *)&len_network_response, 4);
-        buf_append(outgoing, read_data.data(), read_data.size());
+    void enqueue_response(const std::vector<uint8_t> &data) {
+        buf_append(outgoing, data.data(), data.size());
+        want_read  = false;
+        want_write = true;
     }
 
     static Connection* handle_accept(int server_fd) {

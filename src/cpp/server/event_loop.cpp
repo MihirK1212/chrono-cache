@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <sys/poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -16,7 +15,7 @@
 #include "chrono_cache.h"
 
 
-EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), cache(cache) {}
+EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), cache(cache), command_handler(cache) {}
 
 EventLoop::~EventLoop() {}
 
@@ -100,17 +99,14 @@ void EventLoop::run()
                         continue;
                     }
                     const std::vector<uint8_t>& response_data = response.data.value();
-                    printf("client response:");
-                    int len = (int)response_data.size();
-                    printf("client says: len:%d data:%.*s\n",
-                    len, len < 100 ? len : 100, response_data.data());
-
-                    printf("byte by byte: ");
-                    for(int j=0; j<len; j++) {
-                        printf("%d ", (int)response_data[j]);
+                    RespParser::Result result = RespParser::parse(response_data);
+                    if (result.status == RespParser::Status::Complete) {
+                        std::string resp = command_handler.execute(result.value);
+                        conn->enqueue_response({
+                            reinterpret_cast<const uint8_t*>(resp.data()),
+                            reinterpret_cast<const uint8_t*>(resp.data()) + resp.size()
+                        });
                     }
-                    
-                    printf("\n\n");
                 }
                 
             }
