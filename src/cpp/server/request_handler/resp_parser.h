@@ -11,7 +11,7 @@
 
 class RespParser {
 public:
-    // Returns the parsed RESP value, or nullopt on a protocol violation.
+    // Returns the parsed RESP value, or nullopt when more input is needed.
     static std::optional<RespValue> parse(std::string_view buf);
     static std::optional<RespValue> parse(const std::vector<uint8_t>& buf);  // convenience overload for raw byte buffers
 

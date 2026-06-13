@@ -15,18 +15,25 @@ enum class RespType {
 };
 
 struct RespValue {
+    static constexpr size_t kUnsetRespBytes = static_cast<size_t>(-1);
+
     RespType type;
     std::string str_value;         // SimpleString, Error, BulkString
     int64_t int_value = 0;         // Integer
     std::vector<RespValue> array;  // Array
+    size_t num_resp_bytes = kUnsetRespBytes;
     bool is_null = false;
 
-    static RespValue simple_string(const std::string& s);
+    size_t length() const;
+
+    static RespValue simple_string(const std::string& s, size_t num_resp_bytes);
     static RespValue error(const std::string& msg);
-    static RespValue integer(int64_t n);
-    static RespValue bulk_string(const std::string& s);
-    static RespValue null_bulk();
-    static RespValue null_array();
+    static RespValue error(const std::string& msg, size_t num_resp_bytes);
+    static RespValue integer(int64_t n, size_t num_resp_bytes);
+    static RespValue bulk_string(const std::string& s, size_t num_resp_bytes);
+    static RespValue null_bulk(size_t num_resp_bytes);
+    static RespValue null_array(size_t num_resp_bytes);
+    static RespValue array_from_parts(const std::vector<RespValue>& elements, size_t num_resp_bytes);
 };
 
 #endif
