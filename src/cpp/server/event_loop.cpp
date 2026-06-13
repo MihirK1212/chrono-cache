@@ -13,6 +13,7 @@
 #include "connection.h"
 #include "event_loop.h"
 #include "request_handler/resp_parser.h"
+#include "request_handler/resp_serializer.h"
 
 EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), command_handler(cache) {}
 
@@ -99,13 +100,20 @@ void EventLoop::run()
                     }
                     const std::vector<uint8_t>& response_data = response.data.value();
                     std::optional<RespValue> result = RespParser::parse(response_data);
-                    if (result.has_value()) {
-                        std::string resp = command_handler.execute(result.value());
-                        conn->enqueue_response({
-                            reinterpret_cast<const uint8_t*>(resp.data()),
-                            reinterpret_cast<const uint8_t*>(resp.data()) + resp.size()
-                        });
+                    std::string resp;
+                    if (!result.has_value()) {
+                        resp = RespSerializer::error("ERR invalid RESP message");
+                    } else {
+                        try {
+                            resp = command_handler.execute(result.value());
+                        } catch (const std::exception& e) {
+                            resp = RespSerializer::error(std::string("ERR ") + e.what());
+                        }
                     }
+                    conn->enqueue_response({
+                        reinterpret_cast<const uint8_t*>(resp.data()),
+                        reinterpret_cast<const uint8_t*>(resp.data()) + resp.size()
+                    });
                 }
             }
 

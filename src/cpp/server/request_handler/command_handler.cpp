@@ -9,7 +9,6 @@ const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::c
     {"GET",     &CommandHandler::cmd_get},
     {"DEL",     &CommandHandler::cmd_del},
     {"EXPIRE",  &CommandHandler::cmd_expire},
-    {"PEXPIRE", &CommandHandler::cmd_pexpire},
     {"PERSIST", &CommandHandler::cmd_persist},
     {"PTTL",    &CommandHandler::cmd_pttl},
     {"ZADD",    &CommandHandler::cmd_zadd},
@@ -51,8 +50,18 @@ std::string CommandHandler::cmd_set(const std::vector<RespValue>& args) {
     const std::string& value = args[1].str_value;
     std::optional<std::chrono::milliseconds> ttl = std::nullopt;
 
-    if (args.size() >= 4 && (args[2].str_value == "PX" || args[2].str_value == "px")) {
-        ttl = std::chrono::milliseconds(std::stoll(args[3].str_value));
+    if (args.size() == 4) {
+        const std::string& opt = args[2].str_value;
+        if (opt != "EX" && opt != "ex") {
+            return RespSerializer::error("ERR syntax error");
+        }
+        int64_t ms = std::stoll(args[3].str_value);
+        if (ms <= 0) {
+            return RespSerializer::error("ERR invalid expire time in 'SET' command");
+        }
+        ttl = std::chrono::milliseconds(ms);
+    } else if (args.size() != 2) {
+        return RespSerializer::error("ERR syntax error");
     }
 
     cache.set(key, value, ttl);
@@ -91,12 +100,11 @@ std::string CommandHandler::cmd_expire(const std::vector<RespValue>& args) {
     }
 
     int64_t ms = std::stoll(args[1].str_value);
+    if (ms <= 0) {
+        return RespSerializer::error("ERR invalid expire time in 'EXPIRE' command");
+    }
     bool ok = cache.expire(args[0].str_value, std::chrono::milliseconds(ms));
     return RespSerializer::integer(ok ? 1 : 0);
-}
-
-std::string CommandHandler::cmd_pexpire(const std::vector<RespValue>& args) {
-    return cmd_expire(args);
 }
 
 std::string CommandHandler::cmd_persist(const std::vector<RespValue>& args) {

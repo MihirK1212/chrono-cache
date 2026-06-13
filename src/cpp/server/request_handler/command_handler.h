@@ -23,7 +23,6 @@ private:
     std::string cmd_get(const std::vector<RespValue>& args);
     std::string cmd_del(const std::vector<RespValue>& args);
     std::string cmd_expire(const std::vector<RespValue>& args);
-    std::string cmd_pexpire(const std::vector<RespValue>& args);
     std::string cmd_persist(const std::vector<RespValue>& args);
     std::string cmd_pttl(const std::vector<RespValue>& args);
     std::string cmd_zadd(const std::vector<RespValue>& args);
