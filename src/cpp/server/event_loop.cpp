@@ -107,7 +107,6 @@ void EventLoop::run()
                         });
                     }
                 }
-                
             }
 
             if(!conn->want_close && (ready & POLLOUT)) {
