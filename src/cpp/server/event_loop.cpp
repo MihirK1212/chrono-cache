@@ -98,9 +98,9 @@ void EventLoop::run()
                         continue;
                     }
                     const std::vector<uint8_t>& response_data = response.data.value();
-                    RespParser::Result result = RespParser::parse(response_data);
-                    if (result.status == RespParser::Status::Complete) {
-                        std::string resp = command_handler.execute(result.value);
+                    std::optional<RespValue> result = RespParser::parse(response_data);
+                    if (result.has_value()) {
+                        std::string resp = command_handler.execute(result.value());
                         conn->enqueue_response({
                             reinterpret_cast<const uint8_t*>(resp.data()),
                             reinterpret_cast<const uint8_t*>(resp.data()) + resp.size()

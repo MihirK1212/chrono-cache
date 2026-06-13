@@ -1,6 +1,7 @@
 #include "command_handler.h"
+#include "resp_serializer.h"
 
-const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::commands_ = {
+const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::commands_map = {
     {"PING",    &CommandHandler::cmd_ping},
     {"SET",     &CommandHandler::cmd_set},
     {"GET",     &CommandHandler::cmd_get},
@@ -15,10 +16,21 @@ const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::c
     {"ZRANK",   &CommandHandler::cmd_zrank},
 };
 
-CommandHandler::CommandHandler(ChronoCache& cache) : cache_(cache) {}
+CommandHandler::CommandHandler(ChronoCache& cache) : cache(cache) {}
 
 std::string CommandHandler::execute(const RespValue& command) {
-    return "";
+    if (command.type != RespType::Array || command.array.empty()) {
+        return RespSerializer::serialize(RespValue::error("ERR invalid command format"));
+    }
+
+    const std::string& name = command.array[0].str_value; // e.g. "SET"
+    auto it = commands_map.find(name);
+    if (it == commands_map.end()) {
+        return RespSerializer::serialize(RespValue::error("ERR unknown command '" + name + "'"));
+    }
+
+    const std::vector<RespValue> args(command.array.begin() + 1, command.array.end());
+    return (this->*(it->second))(args);
 }
 
 std::string CommandHandler::cmd_ping(const std::vector<RespValue>& args) {

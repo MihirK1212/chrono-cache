@@ -6,18 +6,17 @@
 #include <vector>
 
 #include "resp_types.h"
-#include "resp_serializer.h"
 #include "../../cache/chrono_cache.h"
 
 class CommandHandler {
 public:
     explicit CommandHandler(ChronoCache& cache);
 
-    // Dispatch a parsed RESP command; returns a serialized RESP response string
+    // exectures a RESP command and returns serialized RESP response string
     std::string execute(const RespValue& command);
 
 private:
-    ChronoCache& cache_;
+    ChronoCache& cache;
 
     std::string cmd_ping(const std::vector<RespValue>& args);
     std::string cmd_set(const std::vector<RespValue>& args);
@@ -33,7 +32,7 @@ private:
     std::string cmd_zrank(const std::vector<RespValue>& args);
 
     using CmdFunc = std::string (CommandHandler::*)(const std::vector<RespValue>&);
-    static const std::unordered_map<std::string, CmdFunc> commands_;
+    static const std::unordered_map<std::string, CmdFunc> commands_map;
 };
 
 #endif
