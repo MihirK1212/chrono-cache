@@ -7,7 +7,7 @@
 #include <netinet/ip.h>
 
 #include "worker.h"
-#include "server/event_loop.h"
+#include "event_loop.h"
 #include "socket_utils.h"
 
 Worker::Worker(int id, int port, ChronoCache&cache): id(id), port(port), cache(cache) {};

@@ -27,44 +27,60 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-# ---- Core library ----
-add_library(chrono_cache_core
-    src/cpp/chrono_cache.cpp
-    src/cpp/sorted_sets/sorted_set.cpp
-    src/cpp/sorted_sets/tree.cpp
-    src/cpp/kafka_logging/producer.cpp
-    src/cpp/kafka_logging/consumer.cpp
-    src/cpp/kafka_logging/event_logger.cpp
-    src/cpp/kafka_logging/event_consumer.cpp
-    src/cpp/server/server.cpp
-    src/cpp/server/worker.cpp
-    src/cpp/server/event_loop.cpp
-    src/cpp/server/socket_utils.cpp
-)
-
-target_include_directories(chrono_cache_core PUBLIC src/cpp)
-
-target_compile_options(chrono_cache_core PRIVATE
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Debug>:-O0 -g>
-)
-
-# ---- Main executable ----
-add_executable(chrono_cache src/cpp/main.cpp)
-
 find_package(Threads REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(RDKAFKA REQUIRED rdkafka++)
 
-target_link_libraries(chrono_cache_core PUBLIC
+# ---- Cache library ----
+add_library(cache
+    src/cpp/cache/chrono_cache.cpp
+    src/cpp/cache/sorted_sets/sorted_set.cpp
+    src/cpp/cache/sorted_sets/tree.cpp
+    src/cpp/cache/kafka_logging/producer.cpp
+    src/cpp/cache/kafka_logging/consumer.cpp
+    src/cpp/cache/kafka_logging/event_logger.cpp
+    src/cpp/cache/kafka_logging/event_consumer.cpp
+)
+
+target_include_directories(cache PUBLIC src/cpp/cache)
+
+target_compile_options(cache PRIVATE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Debug>:-O0 -g>
+)
+
+target_link_libraries(cache PUBLIC
     nlohmann_json::nlohmann_json
     ${RDKAFKA_LIBRARIES}
 )
-target_include_directories(chrono_cache_core PUBLIC ${RDKAFKA_INCLUDE_DIRS})
-target_compile_options(chrono_cache_core PUBLIC ${RDKAFKA_CFLAGS_OTHER})
+target_include_directories(cache PUBLIC ${RDKAFKA_INCLUDE_DIRS})
+target_compile_options(cache PUBLIC ${RDKAFKA_CFLAGS_OTHER})
 
-target_link_libraries(chrono_cache PRIVATE chrono_cache_core Threads::Threads)
+# ---- Server library ----
+add_library(server
+    src/cpp/server/server.cpp
+    src/cpp/server/worker.cpp
+    src/cpp/server/event_loop.cpp
+    src/cpp/server/socket_utils.cpp
+    src/cpp/server/request_handler/resp_parser.cpp
+    src/cpp/server/request_handler/resp_serializer.cpp
+    src/cpp/server/request_handler/command_handler.cpp
+)
+
+target_include_directories(server PUBLIC src/cpp/server)
+
+target_compile_options(server PRIVATE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Debug>:-O0 -g>
+)
+
+target_link_libraries(server PUBLIC cache)
+
+# ---- Main executable ----
+add_executable(chrono_cache src/cpp/main.cpp)
+
+target_link_libraries(chrono_cache PRIVATE server Threads::Threads)
 
 target_compile_options(chrono_cache PRIVATE
     $<$<CONFIG:Release>:-O3>

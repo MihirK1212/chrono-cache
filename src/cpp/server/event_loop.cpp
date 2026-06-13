@@ -12,10 +12,9 @@
 
 #include "connection.h"
 #include "event_loop.h"
-#include "chrono_cache.h"
+#include "request_handler/resp_parser.h"
 
-
-EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), cache(cache), command_handler(cache) {}
+EventLoop::EventLoop(int server_fd, ChronoCache&cache) : server_fd(server_fd), command_handler(cache) {}
 
 EventLoop::~EventLoop() {}
 

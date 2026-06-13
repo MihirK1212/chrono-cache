@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "cache_config.h"
-#include "chrono_cache.h"
+#include "../cache/cache_config.h"
+#include "../cache/chrono_cache.h"
 
 class ChronoCacheCLI {
     const CacheConfig& config;

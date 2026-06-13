@@ -2,9 +2,8 @@
 #define CC_EVENT_LOOP_H
 
 #include <atomic>
-#include "../chrono_cache.h"
+#include "../cache/chrono_cache.h"
 #include "request_handler/command_handler.h"
-#include "request_handler/resp_parser.h"
 
 class EventLoop {
     public:
@@ -17,7 +16,6 @@ class EventLoop {
     private:
 
     int server_fd;
-    ChronoCache& cache;
     std::atomic<bool> running{false};
     CommandHandler command_handler;
 };

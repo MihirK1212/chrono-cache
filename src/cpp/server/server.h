@@ -1,8 +1,8 @@
 #ifndef CC_SERVER_H
 #define CC_SERVER_H
 
-#include "chrono_cache.h"
-#include "server/worker.h"
+#include "../cache/chrono_cache.h"
+#include "worker.h"
 #include <memory>
 
 class ChronoCacheServer {
