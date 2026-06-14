@@ -294,7 +294,7 @@ class ChronoCacheCLI {
         return true;
     }
 
-public:
+    public:
     explicit ChronoCacheCLI(const CacheConfig& config) : config(config) {}
 
     void run() {

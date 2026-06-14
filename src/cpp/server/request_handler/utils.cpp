@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <algorithm>
+
 bool parse_string_as_int(std::string_view sv, int& out) {
     if (sv.empty()) return false;
 
@@ -24,4 +26,10 @@ bool parse_string_as_int(std::string_view sv, int& out) {
 
     out = negative ? -value : value;
     return true;
+}
+
+std::string to_upper(std::string_view sv) {
+    std::string result(sv.begin(), sv.end());
+    std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+    return result;
 }

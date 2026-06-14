@@ -18,6 +18,7 @@ public:
 private:
     ChronoCache& cache;
 
+    std::string cmd_init(const std::vector<RespValue>& args);
     std::string cmd_ping(const std::vector<RespValue>& args);
     std::string cmd_set(const std::vector<RespValue>& args);
     std::string cmd_get(const std::vector<RespValue>& args);

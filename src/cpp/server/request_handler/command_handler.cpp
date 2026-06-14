@@ -1,9 +1,10 @@
 #include "command_handler.h"
 #include "resp_serializer.h"
-
+#include "utils.h"
 #include <chrono>
 
 const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::commands_map = {
+    {"INIT",    &CommandHandler::cmd_init},
     {"PING",    &CommandHandler::cmd_ping},
     {"SET",     &CommandHandler::cmd_set},
     {"GET",     &CommandHandler::cmd_get},
@@ -24,14 +25,31 @@ std::string CommandHandler::execute(const RespValue& command) {
         return RespSerializer::error("ERR invalid command format");
     }
 
-    const std::string& name = command.array[0].str_value;
+    const std::string& name = to_upper(command.array[0].str_value);
     auto it = commands_map.find(name);
     if (it == commands_map.end()) {
-        return RespSerializer::error("ERR unknown command '" + name + "'");
+        return RespSerializer::error("ERR unknown command '" + command.array[0].str_value + "'");
     }
 
     const std::vector<RespValue> args(command.array.begin() + 1, command.array.end());
-    return (this->*(it->second))(args);
+    return (this->*(it->second))(args);   
+}
+
+std::string CommandHandler::cmd_init(const std::vector<RespValue>& args) {
+    if(args.size() > 1) {
+        return RespSerializer::error("ERR wrong number of arguments for 'INIT' command");
+    }
+
+    bool with_replay = false;
+    if(args.size() == 1) {
+        const std::string& with_replay_str = args[0].str_value;
+        if(with_replay_str != "true" && with_replay_str != "false") {
+            return RespSerializer::error("ERR invalid argument for 'INIT' command");
+        }
+        with_replay = with_replay_str == "true";
+    }
+    bool result = cache.init(with_replay);
+    return result ? RespSerializer::ok() : RespSerializer::error("ERR replay failed");
 }
 
 std::string CommandHandler::cmd_ping(const std::vector<RespValue>& args) {

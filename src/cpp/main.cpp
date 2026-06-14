@@ -6,9 +6,12 @@
 
 int main() {
 
-    CacheConfig config("localhost:9092", "chrono-events", true);
+    CacheConfig config(
+        "localhost:9092",
+        "chrono-events",
+        false
+    );
     ChronoCache cache(config);
-    cache.init(false);
 
     ChronoCacheServer srv({2811, 0}, cache);
     srv.start();

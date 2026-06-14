@@ -18,7 +18,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build --config Deb
 KAFKA:
 
 **Terminal 1 -> start server**
-cd kafka_2.13-4.2.0
+cd /home/mihir/packages/kafka/kafka_2.13-4.2.0
 
 # Only needed once (first boot) — skip if already formatted
 KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
@@ -27,7 +27,7 @@ bin/kafka-storage.sh format --standalone -t $KAFKA_CLUSTER_ID -c config/server.p
 bin/kafka-server-start.sh config/server.properties
 
 **Terminal 2 -> create topics**
-cd kafka_2.13-4.2.0
+cd /home/mihir/packages/kafka/kafka_2.13-4.2.0
 
 create topic:
 bin/kafka-topics.sh \
