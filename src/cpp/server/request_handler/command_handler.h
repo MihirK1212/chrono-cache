@@ -2,7 +2,6 @@
 #define CC_COMMAND_HANDLER_H
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "resp_types.h"
@@ -30,9 +29,6 @@ private:
     std::string cmd_zscore(const std::vector<RespValue>& args);
     std::string cmd_zrem(const std::vector<RespValue>& args);
     std::string cmd_zrank(const std::vector<RespValue>& args);
-
-    using CmdFunc = std::string (CommandHandler::*)(const std::vector<RespValue>&);
-    static const std::unordered_map<std::string, CmdFunc> commands_map;
 };
 
 #endif

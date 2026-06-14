@@ -11,9 +11,9 @@
 
 class RespParser {
 public:
-    // Returns the parsed RESP value, or nullopt when more input is needed.
+    // returns the parsed RESP value, or nullopt when more input is needed.
     static std::optional<RespValue> parse(std::string_view buf);
-    static std::optional<RespValue> parse(const std::vector<uint8_t>& buf);  // convenience overload for raw byte buffers
+    static std::optional<RespValue> parse(const std::vector<uint8_t>& buf);  
 
 private:
     static std::optional<RespValue> parse_simple_string(std::string_view buf);
@@ -22,7 +22,7 @@ private:
     static std::optional<RespValue> parse_bulk_string(std::string_view buf);
     static std::optional<RespValue> parse_array(std::string_view buf);
 
-    // Returns the offset of the first \r\n pair, or std::string_view::npos
+    // returns the offset of the first \r\n pair, or std::string_view::npos
     static size_t find_crlf(std::string_view buf);
 };
 

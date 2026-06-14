@@ -10,7 +10,7 @@ class ChronoCacheServer {
 
     struct ChronoCacheServerConfig {
         int port;
-        int num_workers; // auto (hardware concurrency limit)
+        int num_workers; // default value is hardware concurrency limit
     };
 
     ChronoCacheServer(const ChronoCacheServerConfig config, ChronoCache& cache);

@@ -9,10 +9,10 @@
 
 class RespSerializer {
 public:
-    // Serialize any RespValue to its wire representation
+    // serializes any RespValue to its wire representation
     static std::string serialize(const RespValue& value);
 
-    // Convenience helpers for common responses
+    // convenience helpers for common responses
     static std::string ok();
     static std::string error(const std::string& msg);
     static std::string integer(int64_t n);

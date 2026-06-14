@@ -3,21 +3,6 @@
 #include "utils.h"
 #include <chrono>
 
-const std::unordered_map<std::string, CommandHandler::CmdFunc> CommandHandler::commands_map = {
-    {"INIT",    &CommandHandler::cmd_init},
-    {"PING",    &CommandHandler::cmd_ping},
-    {"SET",     &CommandHandler::cmd_set},
-    {"GET",     &CommandHandler::cmd_get},
-    {"DEL",     &CommandHandler::cmd_del},
-    {"EXPIRE",  &CommandHandler::cmd_expire},
-    {"PERSIST", &CommandHandler::cmd_persist},
-    {"PTTL",    &CommandHandler::cmd_pttl},
-    {"ZADD",    &CommandHandler::cmd_zadd},
-    {"ZSCORE",  &CommandHandler::cmd_zscore},
-    {"ZREM",    &CommandHandler::cmd_zrem},
-    {"ZRANK",   &CommandHandler::cmd_zrank},
-};
-
 CommandHandler::CommandHandler(ChronoCache& cache) : cache(cache) {}
 
 std::string CommandHandler::execute(const RespValue& command) {
@@ -25,14 +10,23 @@ std::string CommandHandler::execute(const RespValue& command) {
         return RespSerializer::error("ERR invalid command format");
     }
 
-    const std::string& name = to_upper(command.array[0].str_value);
-    auto it = commands_map.find(name);
-    if (it == commands_map.end()) {
-        return RespSerializer::error("ERR unknown command '" + command.array[0].str_value + "'");
-    }
-
+    const std::string  name = to_upper(command.array[0].str_value);
     const std::vector<RespValue> args(command.array.begin() + 1, command.array.end());
-    return (this->*(it->second))(args);   
+
+    if      (name == "INIT")    return cmd_init(args);
+    else if (name == "PING")    return cmd_ping(args);
+    else if (name == "SET")     return cmd_set(args);
+    else if (name == "GET")     return cmd_get(args);
+    else if (name == "DEL")     return cmd_del(args);
+    else if (name == "EXPIRE")  return cmd_expire(args);
+    else if (name == "PERSIST") return cmd_persist(args);
+    else if (name == "PTTL")    return cmd_pttl(args);
+    else if (name == "ZADD")    return cmd_zadd(args);
+    else if (name == "ZSCORE")  return cmd_zscore(args);
+    else if (name == "ZREM")    return cmd_zrem(args);
+    else if (name == "ZRANK")   return cmd_zrank(args);
+
+    return RespSerializer::error("ERR unknown command '" + command.array[0].str_value + "'");
 }
 
 std::string CommandHandler::cmd_init(const std::vector<RespValue>& args) {
