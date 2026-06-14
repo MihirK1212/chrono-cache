@@ -7,7 +7,7 @@ def main():
     print(client.get("key"))
     print(client.set("key", "value"))
     print(client.delete("key"))
-    print(client.expire("key", 10))
+    print(client.expire("key", 10_000))
     print(client.persist("key"))
     print(client.pttl("key"))
     print(client.zadd("key", 1.0, "member"))
