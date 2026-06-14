@@ -221,6 +221,10 @@ void ChronoCache::replay() {
 }
 
 bool ChronoCache::init(bool with_replay) {
+    if (state == ChronoCacheState::READY) {
+        return true;
+    } 
+
     if (state != ChronoCacheState::UNINITIALIZED) {
         throw std::runtime_error("ChronoCache::init() requires UNINITIALIZED state");
     }

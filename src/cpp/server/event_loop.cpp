@@ -90,22 +90,22 @@ void EventLoop::run()
 
             if(ready & POLLIN) {
                 assert(conn->want_read);
-                std::vector<ReadResponse> responses = conn->handle_read();
-                for(const ReadResponse& response: responses) {
-                    if(!response.success) {
+                std::vector<ReadResponse> requests = conn->handle_read();
+                for(const ReadResponse& request: requests) {
+                    if(!request.success) {
                         continue;
                     }
-                    if(!response.data.has_value()) {
+                    if(!request.data.has_value()) {
                         continue;
                     }
-                    const std::vector<uint8_t>& response_data = response.data.value();
-                    std::optional<RespValue> result = RespParser::parse(response_data);
+                    const std::vector<uint8_t>& request_data = request.data.value();
+                    std::optional<RespValue> command = RespParser::parse(request_data);
                     std::string resp;
-                    if (!result.has_value()) {
+                    if (!command.has_value()) {
                         resp = RespSerializer::error("ERR invalid RESP message");
                     } else {
                         try {
-                            resp = command_handler.execute(result.value());
+                            resp = command_handler.execute(command.value());
                         } catch (const std::exception& e) {
                             resp = RespSerializer::error(std::string("ERR ") + e.what());
                         }

@@ -1,21 +1,4 @@
-#include "resp_types.h"
-
-size_t RespValue::length() const {
-    switch (type) {
-        case RespType::SimpleString:
-            return str_value.length();
-        case RespType::Error:
-            return str_value.length();
-        case RespType::Integer:
-            return sizeof(int64_t);
-        case RespType::BulkString:
-            return str_value.length();
-        case RespType::Array:
-            return array.size();
-        case RespType::Null:
-            return 0;
-    }
-}
+#include "resp_value.h"
 
 RespValue RespValue::simple_string(const std::string& s, size_t num_resp_bytes) {
     RespValue v;

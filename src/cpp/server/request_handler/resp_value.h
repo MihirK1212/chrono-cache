@@ -1,5 +1,5 @@
-#ifndef CC_RESP_TYPES_H
-#define CC_RESP_TYPES_H
+#ifndef CC_RESP_VALUE_H
+#define CC_RESP_VALUE_H
 
 #include <cstdint>
 #include <string>
@@ -23,8 +23,6 @@ struct RespValue {
     std::vector<RespValue> array;  // Array
     size_t num_resp_bytes = kUnsetRespBytes;
     bool is_null = false;
-
-    size_t length() const;
 
     static RespValue simple_string(const std::string& s, size_t num_resp_bytes);
     static RespValue error(const std::string& msg);

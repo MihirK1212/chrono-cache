@@ -5,13 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "resp_types.h"
-
 class RespSerializer {
 public:
-    // serializes any RespValue to its wire representation
-    static std::string serialize(const RespValue& value);
-
     // convenience helpers for common responses
     static std::string ok();
     static std::string error(const std::string& msg);

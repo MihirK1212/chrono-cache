@@ -2,37 +2,6 @@
 
 static const std::string CRLF = "\r\n";
 
-std::string RespSerializer::serialize(const RespValue& value) {
-    if (value.is_null) {
-        if (value.type == RespType::Array) {
-            return "*-1" + CRLF;
-        }
-        return "$-1" + CRLF;
-    }
-
-    switch (value.type) {
-        case RespType::SimpleString:
-            return "+" + value.str_value + CRLF;
-        case RespType::Error:
-            return "-" + value.str_value + CRLF;
-        case RespType::Integer:
-            return ":" + std::to_string(value.int_value) + CRLF;
-        case RespType::BulkString:
-            return "$" + std::to_string(value.str_value.size()) + CRLF
-                   + value.str_value + CRLF;
-        case RespType::Array: {
-            std::string out = "*" + std::to_string(value.array.size()) + CRLF;
-            for (const auto& elem : value.array) {
-                out += serialize(elem);
-            }
-            return out;
-        }
-        case RespType::Null:
-            return "$-1" + CRLF;
-    }
-    return "-ERR internal serialization error" + CRLF;
-}
-
 std::string RespSerializer::ok() {
     return "+OK" + CRLF;
 }

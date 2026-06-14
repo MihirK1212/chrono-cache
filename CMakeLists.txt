@@ -63,7 +63,7 @@ add_library(server
     src/cpp/server/worker.cpp
     src/cpp/server/event_loop.cpp
     src/cpp/server/socket_utils.cpp
-    src/cpp/server/request_handler/resp_types.cpp
+    src/cpp/server/request_handler/resp_value.cpp
     src/cpp/server/request_handler/utils.cpp
     src/cpp/server/request_handler/resp_parser.cpp
     src/cpp/server/request_handler/resp_serializer.cpp

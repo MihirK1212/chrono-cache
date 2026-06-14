@@ -1,93 +1,99 @@
-#!/usr/bin/env python3
-import shlex
 import socket
 import struct
-import sys
+import shlex
 
-HOST = "127.0.0.1"
-PORT = 2811
-
-_HDR = struct.Struct("!I")
-
-
-def _recv_exact(sock: socket.socket, n: int) -> bytes:
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise EOFError("Server closed the connection unexpectedly")
-        buf += chunk
-    return bytes(buf)
+import resp_parser
+from resp_serializer import RespSerializer
+from typing import Any
 
 
-def to_resp(tokens: list[str]) -> bytes:
-    parts = [f"*{len(tokens)}\r\n".encode()]
-    for token in tokens:
-        encoded = token.encode()
-        parts.append(f"${len(encoded)}\r\n".encode())
-        parts.append(encoded)
-        parts.append(b"\r\n")
-    return b"".join(parts)
+class ChronoCacheClient:
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+
+    _HDR = struct.Struct("!I")
+
+    def raw_request(self, request: str) -> Any:
+        tokens = shlex.split(request)
+        resp_request = RespSerializer.serialize_to_bulk_string(tokens)
+        self._send_request(resp_request)
+        
+        response = self._recv_response()
+        resp_value = resp_parser.parse(response)
+        
+        return self._get_value_from_resp_value(resp_value)
+
+    def init(self, with_replay: bool):
+        with_replay_str = "true" if with_replay else "false"
+        return self.raw_request(f"INIT {with_replay_str}")
+
+    def get(self, key: str):
+        return self.raw_request(f"GET {key}")
+
+    def set(self, key: str, value: str):
+        return self.raw_request(f"SET {key} {value}")
+
+    def delete(self, key: str):
+        return self.raw_request(f"DEL {key}")
+
+    def expire(self, key: str, seconds: int):
+        return self.raw_request(f"EXPIRE {key} {seconds}")
+
+    def persist(self, key: str):
+        return self.raw_request(f"PERSIST {key}")
+
+    def pttl(self, key: str):
+        return self.raw_request(f"PTTL {key}")
+
+    def zadd(self, key: str, score: float, member: str):
+        return self.raw_request(f"ZADD {key} {score} {member}")
+
+    def zscore(self, key: str, member: str):
+        return self.raw_request(f"ZSCORE {key} {member}")
+
+    def zrem(self, key: str, member: str):
+        return self.raw_request(f"ZREM {key} {member}")
+
+    def zrank(self, key: str, member: str):
+        return self.raw_request(f"ZRANK {key} {member}")
+
+    def _send_request(self, req: bytes) -> None:
+        if not isinstance(req, bytes):
+            raise ValueError("req must be bytes")
+        header = self._HDR.pack(len(req))
+        self.socket.sendall(header + req)
+
+    def _recv_response(self) -> bytes: 
+        def _recv_exact(n: int) -> bytes:
+            buf = bytearray()
+            while len(buf) < n:
+                chunk = self.socket.recv(n - len(buf))
+                if not chunk:
+                    raise EOFError("Server closed the connection unexpectedly")
+                buf += chunk
+            return bytes(buf)
+
+        (length,) = self._HDR.unpack(_recv_exact(self._HDR.size))
+        return _recv_exact(length)
 
 
-def send_request(sock: socket.socket, resp: bytes) -> None:
-    header = _HDR.pack(len(resp))
-    sock.sendall(header + resp)
+    def _get_value_from_resp_value(self, resp_value: resp_parser.RespValue) -> Any:
+        if resp_value is None:
+            raise ValueError("Invalid response from server") 
+        if resp_value.type == resp_parser.RespType.SimpleString:
+            return resp_value.str_value
+        if resp_value.type == resp_parser.RespType.Error:
+            raise ValueError(resp_value.str_value)
+        if resp_value.type == resp_parser.RespType.BulkString:
+            return resp_value.str_value
+        if resp_value.type == resp_parser.RespType.Integer:
+            return int(resp_value.int_value)
+        if resp_value.type == resp_parser.RespType.Array:
+            return [self._get_value_from_resp_value(token) for token in resp_value.array]
+        if resp_value.type == resp_parser.RespType.Null:
+            return None
 
-
-def recv_response(sock: socket.socket) -> bytes:
-    (length,) = _HDR.unpack(_recv_exact(sock, _HDR.size))
-    return _recv_exact(sock, length)
-
-
-def main() -> None:
-    print(f"ChronoCache client -> {HOST}:{PORT}  (Ctrl-D or Ctrl-C to quit)")
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(5.0)
-            try:
-                s.connect((HOST, PORT))
-            except ConnectionRefusedError:
-                print("Connection refused. Is the server running?", file=sys.stderr)
-                sys.exit(1)
-
-            print("Connected.\n")
-
-            while True:
-                try:
-                    line = input("> ").strip()
-                except EOFError:
-                    print()
-                    break
-
-                if not line:
-                    continue
-
-                try:
-                    tokens = shlex.split(line)
-                except ValueError as e:
-                    print(f"Parse error: {e}", file=sys.stderr)
-                    continue
-
-                resp_bytes = to_resp(tokens)
-                print(f"  [sending RESP] {resp_bytes!r}")
-
-                try:
-                    send_request(s, resp_bytes)
-                    raw = recv_response(s)
-                    print(f"< {raw!r}")
-                except EOFError as e:
-                    print(f"Server closed connection: {e}", file=sys.stderr)
-                    break
-                except socket.timeout:
-                    print("Timed out waiting for server response.", file=sys.stderr)
-                except Exception as e:
-                    print(f"Error: {e}", file=sys.stderr)
-                    break
-
-    except KeyboardInterrupt:
-        print("\nExiting.")
-
-
-if __name__ == "__main__":
-    main()
+        raise ValueError("Invalid response from server")
