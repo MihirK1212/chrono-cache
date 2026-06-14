@@ -13,15 +13,14 @@ ChronoCache::ChronoCache(const CacheConfig& config)
     , kafka_brokers(config.kafka_brokers)
     , kafka_topic(config.kafka_cache_events_topic) {}
 
-bool ChronoCache::is_logging_allowed() const {
-    return !disable_event_logging && state == ChronoCacheState::READY;
-}
-
-CacheEventLogger& ChronoCache::ensure_logger() {
-    if (!cache_event_logger) {
-        cache_event_logger.emplace(kafka_brokers, kafka_topic);
+bool ChronoCache::check_logging_allowed() const {
+    if (disable_event_logging || state != ChronoCacheState::READY) {
+        return false;
     }
-    return *cache_event_logger;
+    if (!cache_event_logger) {
+        throw std::logic_error("Event logging is enabled but logger was not initialized");
+    }
+    return true;
 }
 
 bool ChronoCache::is_accepting_ops() const {
@@ -43,8 +42,8 @@ bool ChronoCache::set(const std::string& key, const std::string& value, std::opt
         : CacheEntry(value);
 
     return hash_map.set(key, entry, [&]() {
-        if (is_logging_allowed()) {
-            ensure_logger().log_set(key, value, ttl.has_value() ? ttl->count() : -1);
+        if (check_logging_allowed()) {
+            cache_event_logger->log_set(key, value, ttl.has_value() ? ttl->count() : -1);
         }
     });
 }
@@ -68,8 +67,8 @@ bool ChronoCache::del(const std::string& key)
     check_accepting_ops();
 
     return hash_map.remove(key, [&]() {
-        if (is_logging_allowed()) {
-            ensure_logger().log_del(key);
+        if (check_logging_allowed()) {
+            cache_event_logger->log_del(key);
         }
     });
 }
@@ -89,8 +88,8 @@ bool ChronoCache::expire(const std::string& key, std::chrono::milliseconds ttl) 
         e->update_ttl(ttl);
         current_value = e->get_value();
         updated_ttl = true;
-        if (is_logging_allowed()) {
-            ensure_logger().log_expire(key, current_value, ttl.count());
+        if (check_logging_allowed()) {
+            cache_event_logger->log_expire(key, current_value, ttl.count());
         }
         return false;
     });
@@ -123,8 +122,8 @@ bool ChronoCache::persist(const std::string& key) {
             e->remove_ttl();
             current_value = e->get_value();
             ttl_removed = true;
-            if (is_logging_allowed()) {
-                ensure_logger().log_persist(key, current_value);
+            if (check_logging_allowed()) {
+                cache_event_logger->log_persist(key, current_value);
             }
         }
         return false;
@@ -216,21 +215,27 @@ void ChronoCache::replay() {
         }
     }
 
-    ensure_logger().set_seq_counters(last_applied_seq);
+    if (cache_event_logger) {
+        cache_event_logger->set_seq_counters(last_applied_seq);
+    }
 }
 
 bool ChronoCache::init(bool with_replay) {
+    if (state == ChronoCacheState::READY) {
+        return true;
+    } 
+
     if (state != ChronoCacheState::UNINITIALIZED) {
         throw std::runtime_error("ChronoCache::init() requires UNINITIALIZED state");
+    }
+
+    if (!disable_event_logging) {
+        cache_event_logger.emplace(kafka_brokers, kafka_topic);
     }
 
     if (!with_replay) {
         state = ChronoCacheState::READY;
         return true;
-    }
-
-    if (disable_event_logging) {
-        throw std::runtime_error("Cannot replay: event logging is disabled in config");
     }
 
     state = ChronoCacheState::REPLAYING;
